@@ -1,0 +1,18 @@
+{
+  "locale": ["en"],
+  "service": "CREATOR",
+  "storage": false,
+  "whiteListedDomains": [],
+  "cspDomains": {
+    "connect-src": [
+      "https://*.zoho.in",
+      "https://*.zoho.com",
+      "https://*.zohoapis.in",
+      "https://*.zohocreator.in",
+      "https://*.zohopublic.in"
+    ],
+    "script-src": [
+      "https://*.zohocdn.com"
+    ]
+  }
+}

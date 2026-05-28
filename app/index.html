@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Warehouse Stock Widget</title>
+    <link rel="stylesheet" href="styles.css" />
+    <script src="https://static.zohocdn.com/creator/widgets/version/2.0/widgetsdk-min.js"></script>
+  </head>
+  <body>
+    <main class="shell">
+      <header class="page-title">
+        <h1>Stock Register</h1>
+        <p>Item-wise warehouse stock with location and batch details.</p>
+      </header>
+
+      <section class="filter-panel" aria-label="Item stock search">
+        <div>
+          <label for="itemSearch">Item Name</label>
+          <form id="searchForm" class="filter-grid">
+            <input id="itemSearch" type="search" autocomplete="off" placeholder="Type item code or name" />
+            <button type="submit">Load Stock</button>
+          </form>
+        </div>
+        <div id="itemResults" class="item-results" aria-live="polite"></div>
+      </section>
+
+      <section class="fetched-panel">
+        <div class="section-head">
+          <h2>FETCHED RECORD DETAILS</h2>
+          <p id="fetchedStatus">Search an item to view fetched Location_Stock records.</p>
+        </div>
+        <div class="stock-table-wrap">
+          <table class="fetched-table">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Item Name</th>
+                <th>Warehouse</th>
+                <th>Location</th>
+                <th>Batch</th>
+                <th>Available Stock</th>
+              </tr>
+            </thead>
+            <tbody id="fetchedRecordList">
+              <tr>
+                <td colspan="6" class="matrix-empty">No records fetched yet.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="register-panel">
+        <div class="section-head">
+          <h2>STOCK DETAILS</h2>
+          <p id="status">Click Load Stock to view warehouse, location, and batch stock.</p>
+        </div>
+        <div class="stock-table-wrap" aria-live="polite">
+          <table class="warehouse-matrix">
+            <thead>
+              <tr>
+                <th>Warehouse</th>
+                <th>Warehouse Stock</th>
+                <th>Location</th>
+                <th>Location Stock</th>
+                <th>Batch</th>
+                <th>Batch Stock</th>
+              </tr>
+            </thead>
+            <tbody id="stockList">
+              <tr>
+                <td colspan="6" class="matrix-empty">Search for an item to load current stock.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="summary-strip" aria-label="Stock summary">
+        <article>
+          <span>Total Available</span>
+          <strong id="totalAvailable">0</strong>
+          <small>Total actual stock</small>
+        </article>
+        <article>
+          <span>Warehouses</span>
+          <strong id="warehouseCount">0</strong>
+          <small>Warehouse count</small>
+        </article>
+        <article>
+          <span>Locations</span>
+          <strong id="locationCount">0</strong>
+          <small>Location count</small>
+        </article>
+        <article>
+          <span>Batches</span>
+          <strong id="batchCount">0</strong>
+          <small>Batch count</small>
+        </article>
+      </section>
+    </main>
+
+    <script src="app.js"></script>
+  </body>
+</html>
