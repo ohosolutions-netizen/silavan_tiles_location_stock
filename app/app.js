@@ -1,5 +1,13 @@
 const CONFIG = {
   appName: "silvan-tiles",
+  itemMasterReports: [
+    "ITEM_MASTER",
+    "ITEM_MASTER1",
+    "Item_Master",
+    "Item_Master_Report",
+    "All_Items",
+    "Items",
+  ],
   sourceReport: "LOCATION_STOCK1",
   fields: {
     item: ["ITEM_NAME", "Item", "Item_Name", "ITEM", "Product", "Product_Name", "SKU"],
@@ -15,6 +23,7 @@ const CONFIG = {
 };
 
 const state = {
+  items: [],
   allRows: [],
   loaded: false,
 };
@@ -42,7 +51,7 @@ el.search.addEventListener("input", debounce(() => {
   searchRows(el.search.value.trim());
 }, 350));
 
-setStatus("Loading stock data from LOCATION_STOCK1...");
+setStatus("Loading item master and stock data...");
 loadSourceData();
 
 function debounce(fn, wait) {
@@ -55,38 +64,43 @@ function debounce(fn, wait) {
 
 async function loadSourceData() {
   try {
-    await ZOHO.CREATOR.init();
+    await initializeCreatorSdk();
+    state.items = await loadItemMaster();
     state.allRows = await getAllRecords({
       report_name: CONFIG.sourceReport,
       field_config: "all",
       max_records: 1000,
     });
+    if (!state.items.length) {
+      state.items = buildItemsFromStockRows(state.allRows);
+    }
     state.loaded = true;
-    resetView("Enter ITEM_NAME to search stock.");
-    setStatus("Stock data loaded. Enter ITEM_NAME to view warehouse stock.");
+    renderItemSuggestions("");
+    resetView("Select item - item code to search stock.");
+    setStatus(`Loaded ${state.items.length} item${state.items.length === 1 ? "" : "s"} and ${state.allRows.length} stock row${state.allRows.length === 1 ? "" : "s"}.`);
   } catch (error) {
-    showError(error, "Unable to load LOCATION_STOCK1 data.");
+    showError(error, "Unable to load item master or LOCATION_STOCK1 data.");
   }
 }
 
 function searchRows(term) {
-  resetView("Loading stock rows...");
-
   if (!state.loaded) {
-    setStatus("Loading stock data from LOCATION_STOCK1...");
+    setStatus("Loading item master and stock data...");
     return;
   }
 
   if (!term) {
-    resetView("Enter ITEM_NAME to search stock.");
-    setStatus("Enter ITEM_NAME to view warehouse, location, and batch stock.");
+    renderItemSuggestions("");
+    resetView("Select item - item code to search stock.");
+    setStatus("Select item - item code to view warehouse, location, and batch stock.");
     return;
   }
 
+  renderItemSuggestions(term);
   const rows = state.allRows.filter((row) => rowMatchesSearch(row, term));
   renderFetchedRecords(rows, term);
-  renderSearchSummary(rows, term);
   renderStock(groupRows(rows));
+  setStatus(rows.length ? `Showing ${rows.length} Location_Stock rows for "${term}".` : `No stock rows found for "${term}".`);
 }
 
 function rowMatchesSearch(row, term) {
@@ -98,20 +112,17 @@ function rowMatchesSearch(row, term) {
   return itemText.includes(searchText);
 }
 
-function renderSearchSummary(rows, term) {
+function renderItemSuggestions(term) {
   el.itemResults.innerHTML = "";
-  const uniqueItems = new Map();
-
-  rows.forEach((row) => {
-    const item = displayByCandidates(row, CONFIG.fields.item, "Unnamed item");
-    const sku = displayByCandidates(row, CONFIG.fields.sku, "");
-    const key = `${item}::${sku}`;
-    if (!uniqueItems.has(key)) {
-      uniqueItems.set(key, { item, sku });
+  const searchText = term.toLowerCase();
+  const matches = state.items.filter(({ item, sku }) => {
+    if (!searchText) {
+      return true;
     }
+    return `${item} ${sku}`.toLowerCase().includes(searchText);
   });
 
-  Array.from(uniqueItems.values()).slice(0, 12).forEach(({ item, sku }) => {
+  matches.slice(0, 12).forEach(({ item, sku }) => {
     const button = document.createElement("button");
     button.type = "button";
     button.className = "item-button";
@@ -123,7 +134,9 @@ function renderSearchSummary(rows, term) {
     el.itemResults.appendChild(button);
   });
 
-  setStatus(rows.length ? `Showing ${rows.length} Location_Stock rows where ITEM_NAME matches "${term}".` : `No stock rows found for "${term}".`);
+  if (term && !matches.length) {
+    el.itemResults.innerHTML = `<p class="item-empty">No item master records found for "${escapeHtml(term)}".</p>`;
+  }
 }
 
 function renderFetchedRecords(rows, term) {
@@ -206,7 +219,11 @@ async function getAllRecords(config) {
       request.record_cursor = cursor;
     }
 
-    const response = await ZOHO.CREATOR.DATA.getRecords(request);
+    const response = await withTimeout(
+      window.ZOHO.CREATOR.DATA.getRecords(request),
+      10000,
+      `Creator API timed out while loading ${request.report_name}.`
+    );
     if (response.code !== 3000) {
       throw new Error(response.message || `Creator API returned code ${response.code}`);
     }
@@ -216,6 +233,107 @@ async function getAllRecords(config) {
   } while (cursor);
 
   return rows;
+}
+
+async function initializeCreatorSdk() {
+  if (!window.ZOHO?.CREATOR?.DATA?.getRecords) {
+    throw new Error("Zoho Creator widget SDK is not available.");
+  }
+}
+
+function withTimeout(promise, timeout, message) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => {
+      window.setTimeout(() => reject(new Error(message)), timeout);
+    }),
+  ]);
+}
+
+async function loadItemMaster() {
+  const errors = [];
+  const reportNames = uniqueValues([
+    ...(await findItemMasterReportNames()),
+    ...CONFIG.itemMasterReports,
+  ]);
+
+  for (const reportName of reportNames) {
+    try {
+      const rows = await getAllRecords({
+        report_name: reportName,
+        field_config: "all",
+        max_records: 1000,
+      });
+      const items = normalizeItemRows(rows);
+      if (items.length) {
+        return items;
+      }
+    } catch (error) {
+      errors.push(`${reportName}: ${error.message || error}`);
+    }
+  }
+
+  console.warn("Unable to load configured item master reports.", errors);
+  return [];
+}
+
+async function findItemMasterReportNames() {
+  if (typeof window.ZOHO.CREATOR.META?.getReports !== "function") {
+    return [];
+  }
+
+  try {
+    const request = {};
+    if (CONFIG.appName) {
+      request.app_name = CONFIG.appName;
+    }
+    const response = await withTimeout(
+      window.ZOHO.CREATOR.META.getReports(request),
+      10000,
+      "Creator API timed out while reading report metadata."
+    );
+    if (response.code !== 3000) {
+      return [];
+    }
+    return (response.reports || [])
+      .filter((report) => {
+        const name = `${report.display_name || ""} ${report.link_name || ""}`.toLowerCase();
+        return name.includes("item") && name.includes("master");
+      })
+      .map((report) => report.link_name)
+      .filter(Boolean);
+  } catch (error) {
+    console.warn("Unable to discover item master report.", error);
+    return [];
+  }
+}
+
+function normalizeItemRows(rows) {
+  const uniqueItems = new Map();
+
+  rows.forEach((row) => {
+    const item = displayByCandidates(row, CONFIG.fields.item, "");
+    const sku = displayByCandidates(row, CONFIG.fields.sku, "");
+    if (!item && !sku) {
+      return;
+    }
+    const key = `${item}::${sku}`;
+    if (!uniqueItems.has(key)) {
+      uniqueItems.set(key, { item: item || sku, sku });
+    }
+  });
+
+  return Array.from(uniqueItems.values()).sort((a, b) => {
+    return `${a.item} ${a.sku}`.localeCompare(`${b.item} ${b.sku}`);
+  });
+}
+
+function buildItemsFromStockRows(rows) {
+  return normalizeItemRows(rows);
+}
+
+function uniqueValues(values) {
+  return Array.from(new Set(values.filter(Boolean)));
 }
 
 function renderStock(groups) {

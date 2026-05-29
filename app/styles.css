@@ -125,6 +125,12 @@ label,
 .item-code {
   color: var(--muted);
   font-size: 12px;
+  margin-left: 12px;
+}
+
+.item-empty {
+  color: var(--muted);
+  margin: 0;
 }
 
 .register-panel {
