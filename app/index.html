@@ -15,7 +15,6 @@
             <h1>Stock Register <span>V3700</span></h1>
             <p>Item-wise warehouse stock with location and batch details.</p>
           </div>
-          <button class="download-button" type="button">Download CSV</button>
         </header>
 
         <section class="filter-panel" aria-label="Item stock search">
@@ -24,20 +23,6 @@
               <label for="itemSearch">Item Name</label>
               <input id="itemSearch" type="search" autocomplete="off" placeholder="Type item code or name" />
               <div id="itemResults" class="item-results" aria-live="polite"></div>
-            </div>
-            <div class="field">
-              <label for="warehouseSelect">Warehouse</label>
-              <select id="warehouseSelect">
-                <option>Select warehouse</option>
-              </select>
-            </div>
-            <div class="field">
-              <label for="fromDate">From Date</label>
-              <input id="fromDate" type="date" value="2026-05-01" />
-            </div>
-            <div class="field">
-              <label for="toDate">To Date</label>
-              <input id="toDate" type="date" value="2026-05-29" />
             </div>
             <button id="loadStockButton" class="muted-action" type="button">Load Stock</button>
             <button id="applyButton" type="submit">Apply</button>
@@ -135,6 +120,6 @@
       </div>
     </main>
 
-    <script src="app.js?v=20260529-3"></script>
+    <script src="app.js?v=20260529-4"></script>
   </body>
 </html>

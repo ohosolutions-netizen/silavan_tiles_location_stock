@@ -26,8 +26,7 @@ body {
 }
 
 button,
-input,
-select {
+input {
   font: inherit;
 }
 
@@ -46,9 +45,6 @@ select {
 }
 
 .page-title {
-  align-items: center;
-  display: flex;
-  justify-content: space-between;
   margin-bottom: 14px;
 }
 
@@ -106,7 +102,7 @@ label,
 .filter-grid {
   align-items: end;
   display: grid;
-  grid-template-columns: minmax(280px, 1.45fr) minmax(210px, 1fr) minmax(130px, 0.48fr) minmax(130px, 0.48fr) 138px 86px;
+  grid-template-columns: minmax(360px, 1fr) 150px 110px;
   gap: 12px;
 }
 
@@ -115,8 +111,7 @@ label,
   position: relative;
 }
 
-.filter-grid input,
-.filter-grid select {
+.filter-grid input {
   background: #fff;
   border: 1px solid var(--line-dark);
   border-radius: 6px;
@@ -126,15 +121,13 @@ label,
   width: 100%;
 }
 
-.filter-grid input:focus,
-.filter-grid select:focus {
+.filter-grid input:focus {
   border-color: var(--accent);
   outline: 3px solid rgba(47, 111, 98, 0.14);
 }
 
 .filter-grid button,
-.item-button,
-.download-button {
+.item-button {
   background: var(--accent);
   border: 1px solid var(--accent);
   border-radius: 6px;
@@ -145,14 +138,12 @@ label,
   padding: 0 14px;
 }
 
-.filter-grid button:hover,
-.download-button:hover {
+.filter-grid button:hover {
   background: var(--accent-dark);
   border-color: var(--accent-dark);
 }
 
-.filter-grid .muted-action,
-.download-button {
+.filter-grid .muted-action {
   background: var(--accent-soft);
   border-color: #cfe6e0;
   color: var(--accent-dark);
@@ -161,10 +152,6 @@ label,
 .filter-grid .muted-action.is-loaded {
   color: #7a918b;
   cursor: default;
-}
-
-.download-button {
-  min-width: 130px;
 }
 
 #status {
@@ -444,13 +431,12 @@ label,
 }
 
 @media (max-width: 980px) {
-  .filter-grid,
-  .summary-strip {
-    grid-template-columns: 1fr 1fr;
+  .filter-grid {
+    grid-template-columns: minmax(220px, 1fr) 132px 96px;
   }
 
-  .item-field {
-    grid-column: 1 / -1;
+  .summary-strip {
+    grid-template-columns: 1fr 1fr;
   }
 }
 
@@ -461,15 +447,6 @@ label,
 
   .app-card {
     padding: 12px;
-  }
-
-  .page-title {
-    align-items: flex-start;
-    gap: 12px;
-  }
-
-  .download-button {
-    min-width: 0;
   }
 
   .filter-grid,
