@@ -1,12 +1,7 @@
 const CONFIG = {
   appName: "silvan-tiles",
   itemMasterReports: [
-    "ITEM_MASTER",
-    "ITEM_MASTER1",
-    "Item_Master",
-    "Item_Master_Report",
-    "All_Items",
-    "Items",
+    "API_ITEM_MASTER",
   ],
   sourceReport: "LOCATION_STOCK1",
   fields: {
@@ -25,11 +20,13 @@ const CONFIG = {
 const state = {
   items: [],
   allRows: [],
-  loaded: false,
+  itemMasterLoaded: false,
+  selectedItem: null,
 };
 
 const el = {
   form: document.querySelector("#searchForm"),
+  loadStock: document.querySelector("#loadStockButton"),
   search: document.querySelector("#itemSearch"),
   itemResults: document.querySelector("#itemResults"),
   fetchedStatus: document.querySelector("#fetchedStatus"),
@@ -44,15 +41,20 @@ const el = {
 
 el.form.addEventListener("submit", (event) => {
   event.preventDefault();
-  searchRows(el.search.value.trim());
+  applyStockSearch(el.search.value.trim());
 });
 
 el.search.addEventListener("input", debounce(() => {
-  searchRows(el.search.value.trim());
+  state.selectedItem = null;
+  filterItemMaster(el.search.value.trim());
 }, 350));
 
-setStatus("Loading item master and stock data...");
-loadSourceData();
+el.loadStock.addEventListener("click", () => {
+  loadItemMasterData();
+});
+
+resetView("Click Load Stock to load item master.");
+setStatus("Click Load Stock to fetch API_ITEM_MASTER, then select an item and click Apply.");
 
 function debounce(fn, wait) {
   let timer;
@@ -62,54 +64,106 @@ function debounce(fn, wait) {
   };
 }
 
-async function loadSourceData() {
+async function loadItemMasterData() {
   try {
+    setStatus("Loading item master from API_ITEM_MASTER...");
+    el.itemResults.innerHTML = "";
     await initializeCreatorSdk();
     state.items = await loadItemMaster();
-    state.allRows = await getAllRecords({
-      report_name: CONFIG.sourceReport,
-      field_config: "all",
-      max_records: 1000,
-    });
-    if (!state.items.length) {
-      state.items = buildItemsFromStockRows(state.allRows);
-    }
-    state.loaded = true;
+    state.itemMasterLoaded = true;
+    state.selectedItem = null;
     renderItemSuggestions("");
-    resetView("Select item - item code to search stock.");
-    setStatus(`Loaded ${state.items.length} item${state.items.length === 1 ? "" : "s"} and ${state.allRows.length} stock row${state.allRows.length === 1 ? "" : "s"}.`);
+    resetView("Select item - item code, then click Apply.");
+    setStatus(`Loaded ${state.items.length} item master record${state.items.length === 1 ? "" : "s"} from API_ITEM_MASTER.`);
   } catch (error) {
-    showError(error, "Unable to load item master or LOCATION_STOCK1 data.");
+    showError(error, "Unable to load API_ITEM_MASTER data.");
   }
 }
 
-function searchRows(term) {
-  if (!state.loaded) {
-    setStatus("Loading item master and stock data...");
+function filterItemMaster(term) {
+  if (!state.itemMasterLoaded) {
+    setStatus("Click Load Stock to fetch API_ITEM_MASTER before searching.");
     return;
   }
 
   if (!term) {
     renderItemSuggestions("");
-    resetView("Select item - item code to search stock.");
-    setStatus("Select item - item code to view warehouse, location, and batch stock.");
+    resetView("Select item - item code, then click Apply.");
+    setStatus("Select item - item code and click Apply.");
     return;
   }
 
   renderItemSuggestions(term);
-  const rows = state.allRows.filter((row) => rowMatchesSearch(row, term));
-  renderFetchedRecords(rows, term);
-  renderStock(groupRows(rows));
-  setStatus(rows.length ? `Showing ${rows.length} Location_Stock rows for "${term}".` : `No stock rows found for "${term}".`);
+  setStatus("Select item - item code from API_ITEM_MASTER, then click Apply.");
 }
 
-function rowMatchesSearch(row, term) {
-  const searchText = term.toLowerCase();
-  const itemText = [
-    displayByCandidates(row, CONFIG.fields.item, ""),
-    displayByCandidates(row, CONFIG.fields.sku, ""),
-  ].join(" ").toLowerCase();
-  return itemText.includes(searchText);
+async function applyStockSearch(term) {
+  if (!state.itemMasterLoaded) {
+    setStatus("Click Load Stock to fetch API_ITEM_MASTER before applying.");
+    return;
+  }
+
+  const selected = getSelectedItem(term);
+  if (!selected) {
+    setStatus("Select a valid item - item code from API_ITEM_MASTER, then click Apply.", true);
+    return;
+  }
+
+  try {
+    setStatus(`Loading LOCATION_STOCK1 for ${formatItemLabel(selected)}...`);
+    resetView("Loading Location_Stock records...");
+    state.allRows = await getAllRecords({
+      report_name: CONFIG.sourceReport,
+      field_config: "all",
+      max_records: 1000,
+    });
+    const rows = state.allRows.filter((row) => rowMatchesSelectedItem(row, selected));
+    renderFetchedRecords(rows, formatItemLabel(selected));
+    renderStock(groupRows(rows));
+    setStatus(rows.length ? `Showing ${rows.length} Location_Stock rows for ${formatItemLabel(selected)}.` : `No Location_Stock rows found for ${formatItemLabel(selected)}.`);
+  } catch (error) {
+    showError(error, "Unable to load LOCATION_STOCK1 data.");
+  }
+}
+
+function getSelectedItem(term) {
+  if (state.selectedItem && formatItemLabel(state.selectedItem) === term) {
+    return state.selectedItem;
+  }
+
+  const normalizedTerm = normalizeText(term);
+  return state.items.find((item) => {
+    return normalizeText(formatItemLabel(item)) === normalizedTerm
+      || normalizeText(item.sku) === normalizedTerm
+      || normalizeText(item.item) === normalizedTerm;
+  });
+}
+
+function rowMatchesSelectedItem(row, selected) {
+  const rowItem = displayByCandidates(row, CONFIG.fields.item, "");
+  const rowSku = displayByCandidates(row, CONFIG.fields.sku, "");
+  return valuesMatch(rowSku, selected.sku)
+    || valuesMatch(rowItem, selected.item)
+    || valueContains(rowItem, selected.sku)
+    || valueContains(rowItem, selected.item);
+}
+
+function valuesMatch(left, right) {
+  if (!left || !right) {
+    return false;
+  }
+  return normalizeText(left) === normalizeText(right);
+}
+
+function valueContains(left, right) {
+  if (!left || !right) {
+    return false;
+  }
+  return normalizeText(left).includes(normalizeText(right));
+}
+
+function normalizeText(value) {
+  return String(value || "").trim().toLowerCase();
 }
 
 function renderItemSuggestions(term) {
@@ -128,8 +182,11 @@ function renderItemSuggestions(term) {
     button.className = "item-button";
     button.innerHTML = `<span>${escapeHtml(item)}</span><span class="item-code">${escapeHtml(sku)}</span>`;
     button.addEventListener("click", () => {
-      el.search.value = sku || item;
-      searchRows(sku || item);
+      state.selectedItem = { item, sku };
+      el.search.value = formatItemLabel(state.selectedItem);
+      el.itemResults.innerHTML = "";
+      resetView("Click Apply to fetch LOCATION_STOCK1 and show grouped stock.");
+      setStatus(`Selected ${formatItemLabel(state.selectedItem)}. Click Apply.`);
     });
     el.itemResults.appendChild(button);
   });
@@ -253,8 +310,8 @@ function withTimeout(promise, timeout, message) {
 async function loadItemMaster() {
   const errors = [];
   const reportNames = uniqueValues([
-    ...(await findItemMasterReportNames()),
     ...CONFIG.itemMasterReports,
+    ...(await findItemMasterReportNames()),
   ]);
 
   for (const reportName of reportNames) {
@@ -328,12 +385,12 @@ function normalizeItemRows(rows) {
   });
 }
 
-function buildItemsFromStockRows(rows) {
-  return normalizeItemRows(rows);
-}
-
 function uniqueValues(values) {
   return Array.from(new Set(values.filter(Boolean)));
+}
+
+function formatItemLabel({ item, sku }) {
+  return sku ? `${item} - ${sku}` : item;
 }
 
 function renderStock(groups) {

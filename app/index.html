@@ -19,7 +19,8 @@
           <label for="itemSearch">Item - Item Code</label>
           <form id="searchForm" class="filter-grid">
             <input id="itemSearch" type="search" autocomplete="off" placeholder="Type item or item code" />
-            <button type="submit">Load Stock</button>
+            <button id="loadStockButton" type="button">Load Stock</button>
+            <button id="applyButton" type="submit">Apply</button>
           </form>
         </div>
         <div id="itemResults" class="item-results" aria-live="polite"></div>
@@ -54,7 +55,7 @@
       <section class="register-panel">
         <div class="section-head">
           <h2>STOCK DETAILS</h2>
-          <p id="status">Click Load Stock to view warehouse, location, and batch stock.</p>
+          <p id="status">Click Load Stock to load item master.</p>
         </div>
         <div class="stock-table-wrap" aria-live="polite">
           <table class="warehouse-matrix">
@@ -70,7 +71,7 @@
             </thead>
             <tbody id="stockList">
               <tr>
-                <td colspan="6" class="matrix-empty">Search for an item to load current stock.</td>
+                <td colspan="6" class="matrix-empty">Click Load Stock to load item master.</td>
               </tr>
             </tbody>
           </table>
@@ -101,6 +102,6 @@
       </section>
     </main>
 
-    <script src="app.js?v=20260529"></script>
+    <script src="app.js?v=20260529-2"></script>
   </body>
 </html>
