@@ -28,11 +28,8 @@ const el = {
   form: document.querySelector("#searchForm"),
   loadStock: document.querySelector("#loadStockButton"),
   loadingOverlay: document.querySelector("#loadingOverlay"),
-  rowCountBadge: document.querySelector("#rowCountBadge"),
   search: document.querySelector("#itemSearch"),
   itemResults: document.querySelector("#itemResults"),
-  fetchedStatus: document.querySelector("#fetchedStatus"),
-  fetchedRecordList: document.querySelector("#fetchedRecordList"),
   stockList: document.querySelector("#stockList"),
   status: document.querySelector("#status"),
   totalAvailable: document.querySelector("#totalAvailable"),
@@ -67,12 +64,17 @@ function debounce(fn, wait) {
 }
 
 async function loadItemMasterData() {
+  const startedAt = Date.now();
   try {
     setLoading(true);
     el.loadStock.textContent = "Loading...";
     el.loadStock.classList.remove("is-loaded");
     setStatus("Loading item master from API_ITEM_MASTER...");
     el.itemResults.innerHTML = "";
+    await waitForPaint();
+    if (isLocalPreview()) {
+      throw new Error("Local preview is not logged into Zoho Creator. Open this widget inside Creator to load API_ITEM_MASTER.");
+    }
     await initializeCreatorSdk();
     state.items = await loadItemMaster();
     state.itemMasterLoaded = true;
@@ -87,6 +89,7 @@ async function loadItemMasterData() {
     el.loadStock.classList.remove("is-loaded");
     showError(error, "Unable to load API_ITEM_MASTER data.");
   } finally {
+    await wait(Math.max(0, 500 - (Date.now() - startedAt)));
     setLoading(false);
   }
 }
@@ -129,7 +132,6 @@ async function applyStockSearch(term) {
       max_records: 1000,
     });
     const rows = state.allRows.filter((row) => rowMatchesSelectedItem(row, selected));
-    renderFetchedRecords(rows, formatItemLabel(selected));
     renderStock(groupRows(rows));
     setStatus(rows.length ? `Showing ${rows.length} Location_Stock rows for ${formatItemLabel(selected)}.` : `No Location_Stock rows found for ${formatItemLabel(selected)}.`);
   } catch (error) {
@@ -207,31 +209,6 @@ function renderItemSuggestions(term) {
   }
 }
 
-function renderFetchedRecords(rows, term) {
-  el.fetchedRecordList.innerHTML = "";
-  updateRowCount(rows.length);
-
-  if (!rows.length) {
-    el.fetchedRecordList.innerHTML = `<tr><td colspan="6" class="matrix-empty">No Location_Stock records found for "${escapeHtml(term)}".</td></tr>`;
-    el.fetchedStatus.textContent = `Fetched 0 records for ITEM_NAME "${term}".`;
-    return;
-  }
-
-  rows.forEach((row, index) => {
-    const tr = document.createElement("tr");
-    tr.innerHTML = `
-      <td>${index + 1}</td>
-      <td>${escapeHtml(displayByCandidates(row, CONFIG.fields.item, "-"))}</td>
-      <td>${escapeHtml(displayByCandidates(row, CONFIG.fields.warehouse, "-"))}</td>
-      <td>${escapeHtml(displayByCandidates(row, CONFIG.fields.location, "-"))}</td>
-      <td>${escapeHtml(displayByCandidates(row, CONFIG.fields.batch, "-"))}</td>
-      <td><strong class="stock-number">${numberText(valueByCandidates(row, CONFIG.fields.available))} ${escapeHtml(displayByCandidates(row, CONFIG.fields.uom, ""))}</strong></td>
-    `;
-    el.fetchedRecordList.appendChild(tr);
-  });
-
-  el.fetchedStatus.textContent = `Fetched ${rows.length} Location_Stock record${rows.length === 1 ? "" : "s"} for ITEM_NAME "${term}".`;
-}
 
 function groupRows(rows) {
   const warehouses = new Map();
@@ -310,6 +287,13 @@ async function initializeCreatorSdk() {
   }
 }
 
+function isLocalPreview() {
+  if (!["localhost", "127.0.0.1", "::1"].includes(window.location.hostname)) {
+    return false;
+  }
+  return !window.ZOHO?.CREATOR?.DATA?.getRecords;
+}
+
 function withTimeout(promise, timeout, message) {
   return Promise.race([
     promise,
@@ -317,6 +301,20 @@ function withTimeout(promise, timeout, message) {
       window.setTimeout(() => reject(new Error(message)), timeout);
     }),
   ]);
+}
+
+function wait(ms) {
+  return new Promise((resolve) => {
+    window.setTimeout(resolve, ms);
+  });
+}
+
+function waitForPaint() {
+  return new Promise((resolve) => {
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(resolve);
+    });
+  });
 }
 
 async function loadItemMaster() {
@@ -552,9 +550,6 @@ function updateSummary(groups) {
 
 function resetView(message = "Loading stock rows...") {
   el.stockList.innerHTML = `<tr><td colspan="6" class="matrix-empty">${escapeHtml(message)}</td></tr>`;
-  el.fetchedRecordList.innerHTML = `<tr><td colspan="6" class="matrix-empty">No records fetched yet.</td></tr>`;
-  el.fetchedStatus.textContent = "Search an item to view fetched Location_Stock records.";
-  updateRowCount(0);
   updateSummary([]);
 }
 
@@ -564,12 +559,14 @@ function setStatus(message, isError = false) {
 }
 
 function setLoading(isLoading) {
-  el.loadingOverlay.hidden = !isLoading;
+  el.loadingOverlay.hidden = false;
+  el.loadingOverlay.classList.toggle("is-visible", isLoading);
+  document.body.classList.toggle("is-loading", isLoading);
+  if (!isLoading) {
+    el.loadingOverlay.hidden = true;
+  }
 }
 
-function updateRowCount(count) {
-  el.rowCountBadge.textContent = `${count} row${count === 1 ? "" : "s"}`;
-}
 
 function showError(error, fallback) {
   console.error(error);
