@@ -9,99 +9,132 @@
   </head>
   <body>
     <main class="shell">
-      <header class="page-title">
-        <h1>Stock Register</h1>
-        <p>Item-wise warehouse stock with location and batch details.</p>
-      </header>
+      <section class="app-card">
+        <header class="page-title">
+          <div>
+            <h1>Stock Register <span>V3700</span></h1>
+            <p>Item-wise warehouse stock with location and batch details.</p>
+          </div>
+          <button class="download-button" type="button">Download CSV</button>
+        </header>
 
-      <section class="filter-panel" aria-label="Item stock search">
-        <div>
-          <label for="itemSearch">Item - Item Code</label>
+        <section class="filter-panel" aria-label="Item stock search">
           <form id="searchForm" class="filter-grid">
-            <input id="itemSearch" type="search" autocomplete="off" placeholder="Type item or item code" />
-            <button id="loadStockButton" type="button">Load Stock</button>
+            <div class="field item-field">
+              <label for="itemSearch">Item Name</label>
+              <input id="itemSearch" type="search" autocomplete="off" placeholder="Type item code or name" />
+              <div id="itemResults" class="item-results" aria-live="polite"></div>
+            </div>
+            <div class="field">
+              <label for="warehouseSelect">Warehouse</label>
+              <select id="warehouseSelect">
+                <option>Select warehouse</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="fromDate">From Date</label>
+              <input id="fromDate" type="date" value="2026-05-01" />
+            </div>
+            <div class="field">
+              <label for="toDate">To Date</label>
+              <input id="toDate" type="date" value="2026-05-29" />
+            </div>
+            <button id="loadStockButton" class="muted-action" type="button">Load Stock</button>
             <button id="applyButton" type="submit">Apply</button>
           </form>
-        </div>
-        <div id="itemResults" class="item-results" aria-live="polite"></div>
-      </section>
-
-      <section class="fetched-panel">
-        <div class="section-head">
-          <h2>FETCHED RECORD DETAILS</h2>
-          <p id="fetchedStatus">Search an item to view fetched Location_Stock records.</p>
-        </div>
-        <div class="stock-table-wrap">
-          <table class="fetched-table">
-            <thead>
-              <tr>
-                <th>#</th>
-                <th>Item Name</th>
-                <th>Warehouse</th>
-                <th>Location</th>
-                <th>Batch</th>
-                <th>Available Stock</th>
-              </tr>
-            </thead>
-            <tbody id="fetchedRecordList">
-              <tr>
-                <td colspan="6" class="matrix-empty">No records fetched yet.</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </section>
-
-      <section class="register-panel">
-        <div class="section-head">
-          <h2>STOCK DETAILS</h2>
           <p id="status">Click Load Stock to load item master.</p>
-        </div>
-        <div class="stock-table-wrap" aria-live="polite">
-          <table class="warehouse-matrix">
-            <thead>
-              <tr>
-                <th>Warehouse</th>
-                <th>Warehouse Stock</th>
-                <th>Location</th>
-                <th>Location Stock</th>
-                <th>Batch</th>
-                <th>Batch Stock</th>
-              </tr>
-            </thead>
-            <tbody id="stockList">
-              <tr>
-                <td colspan="6" class="matrix-empty">Click Load Stock to load item master.</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+        </section>
+
+        <section class="fetched-panel">
+          <div class="section-head">
+            <div>
+              <h2>FETCHED RECORD DETAILS</h2>
+              <p id="fetchedStatus">Search an item to view fetched Location_Stock records.</p>
+            </div>
+            <span id="rowCountBadge" class="row-badge">0 rows</span>
+          </div>
+          <div class="stock-table-wrap">
+            <table class="fetched-table">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Item Name</th>
+                  <th>Warehouse</th>
+                  <th>Location</th>
+                  <th>Batch</th>
+                  <th>Available Stock</th>
+                </tr>
+              </thead>
+              <tbody id="fetchedRecordList">
+                <tr>
+                  <td colspan="6" class="matrix-empty">No records fetched yet.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="register-panel">
+          <div class="section-head">
+            <div>
+              <h2>STOCK DETAILS</h2>
+              <p>Warehouse, location, and batch grouping for the selected item.</p>
+            </div>
+          </div>
+          <div class="stock-table-wrap" aria-live="polite">
+            <table class="warehouse-matrix">
+              <thead>
+                <tr>
+                  <th>Warehouse</th>
+                  <th>Warehouse Stock</th>
+                  <th>Location</th>
+                  <th>Location Stock</th>
+                  <th>Batch</th>
+                  <th>Batch Stock</th>
+                </tr>
+              </thead>
+              <tbody id="stockList">
+                <tr>
+                  <td colspan="6" class="matrix-empty">Click Load Stock to load item master.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="summary-strip" aria-label="Stock summary">
+          <article>
+            <span>Total Available</span>
+            <strong id="totalAvailable">0</strong>
+            <small>Total actual stock</small>
+          </article>
+          <article>
+            <span>Warehouses</span>
+            <strong id="warehouseCount">0</strong>
+            <small>Warehouse count</small>
+          </article>
+          <article>
+            <span>Locations</span>
+            <strong id="locationCount">0</strong>
+            <small>Location count</small>
+          </article>
+          <article>
+            <span>Batches</span>
+            <strong id="batchCount">0</strong>
+            <small>Batch count</small>
+          </article>
+        </section>
       </section>
 
-      <section class="summary-strip" aria-label="Stock summary">
-        <article>
-          <span>Total Available</span>
-          <strong id="totalAvailable">0</strong>
-          <small>Total actual stock</small>
-        </article>
-        <article>
-          <span>Warehouses</span>
-          <strong id="warehouseCount">0</strong>
-          <small>Warehouse count</small>
-        </article>
-        <article>
-          <span>Locations</span>
-          <strong id="locationCount">0</strong>
-          <small>Location count</small>
-        </article>
-        <article>
-          <span>Batches</span>
-          <strong id="batchCount">0</strong>
-          <small>Batch count</small>
-        </article>
-      </section>
+      <div id="loadingOverlay" class="loading-overlay" hidden>
+        <div class="loading-card" role="status" aria-live="polite">
+          <div class="spinner" aria-hidden="true"></div>
+          <strong>Loading masters...</strong>
+          <p>This may take up to a minute for large catalogs</p>
+        </div>
+      </div>
     </main>
 
-    <script src="app.js?v=20260529-2"></script>
+    <script src="app.js?v=20260529-3"></script>
   </body>
 </html>

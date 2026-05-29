@@ -27,6 +27,8 @@ const state = {
 const el = {
   form: document.querySelector("#searchForm"),
   loadStock: document.querySelector("#loadStockButton"),
+  loadingOverlay: document.querySelector("#loadingOverlay"),
+  rowCountBadge: document.querySelector("#rowCountBadge"),
   search: document.querySelector("#itemSearch"),
   itemResults: document.querySelector("#itemResults"),
   fetchedStatus: document.querySelector("#fetchedStatus"),
@@ -66,6 +68,9 @@ function debounce(fn, wait) {
 
 async function loadItemMasterData() {
   try {
+    setLoading(true);
+    el.loadStock.textContent = "Loading...";
+    el.loadStock.classList.remove("is-loaded");
     setStatus("Loading item master from API_ITEM_MASTER...");
     el.itemResults.innerHTML = "";
     await initializeCreatorSdk();
@@ -74,9 +79,15 @@ async function loadItemMasterData() {
     state.selectedItem = null;
     renderItemSuggestions("");
     resetView("Select item - item code, then click Apply.");
+    el.loadStock.textContent = "Masters Loaded";
+    el.loadStock.classList.add("is-loaded");
     setStatus(`Loaded ${state.items.length} item master record${state.items.length === 1 ? "" : "s"} from API_ITEM_MASTER.`);
   } catch (error) {
+    el.loadStock.textContent = "Load Stock";
+    el.loadStock.classList.remove("is-loaded");
     showError(error, "Unable to load API_ITEM_MASTER data.");
+  } finally {
+    setLoading(false);
   }
 }
 
@@ -198,6 +209,7 @@ function renderItemSuggestions(term) {
 
 function renderFetchedRecords(rows, term) {
   el.fetchedRecordList.innerHTML = "";
+  updateRowCount(rows.length);
 
   if (!rows.length) {
     el.fetchedRecordList.innerHTML = `<tr><td colspan="6" class="matrix-empty">No Location_Stock records found for "${escapeHtml(term)}".</td></tr>`;
@@ -542,12 +554,21 @@ function resetView(message = "Loading stock rows...") {
   el.stockList.innerHTML = `<tr><td colspan="6" class="matrix-empty">${escapeHtml(message)}</td></tr>`;
   el.fetchedRecordList.innerHTML = `<tr><td colspan="6" class="matrix-empty">No records fetched yet.</td></tr>`;
   el.fetchedStatus.textContent = "Search an item to view fetched Location_Stock records.";
+  updateRowCount(0);
   updateSummary([]);
 }
 
 function setStatus(message, isError = false) {
   el.status.textContent = message;
   el.status.classList.toggle("error", isError);
+}
+
+function setLoading(isLoading) {
+  el.loadingOverlay.hidden = !isLoading;
+}
+
+function updateRowCount(count) {
+  el.rowCountBadge.textContent = `${count} row${count === 1 ? "" : "s"}`;
 }
 
 function showError(error, fallback) {
