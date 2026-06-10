@@ -42,16 +42,14 @@
               <thead>
                 <tr>
                   <th>Warehouse</th>
-                  <th>Warehouse Stock</th>
-                  <th>Location</th>
-                  <th>Location Stock</th>
-                  <th>Batch</th>
-                  <th>Batch Stock</th>
+                  <th>Warehouse Stock (Nos)</th>
+                  <th>Warehouse Stock (Boxes)</th>
+                  <th>Details</th>
                 </tr>
               </thead>
               <tbody id="stockList">
                 <tr>
-                  <td colspan="6" class="matrix-empty">Click Load Stock to load item master.</td>
+                  <td colspan="4" class="matrix-empty">Click Load Stock to load item master.</td>
                 </tr>
               </tbody>
             </table>
@@ -89,8 +87,21 @@
           <p>This may take up to a minute for large catalogs</p>
         </div>
       </div>
+
+      <div id="detailsModal" class="details-modal" hidden>
+        <section class="details-dialog" role="dialog" aria-modal="true" aria-labelledby="detailsModalTitle">
+          <header class="details-dialog-head">
+            <div>
+              <h2 id="detailsModalTitle">Warehouse Details</h2>
+              <p id="detailsModalSubtitle"></p>
+            </div>
+            <button id="closeDetailsModal" class="modal-close" type="button" aria-label="Close details">&times;</button>
+          </header>
+          <div id="detailsModalContent" class="details-dialog-content"></div>
+        </section>
+      </div>
     </main>
 
-    <script src="app.js?v=20260529-7"></script>
+    <script src="app.js?v=20260610-3"></script>
   </body>
 </html>

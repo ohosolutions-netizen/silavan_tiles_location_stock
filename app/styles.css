@@ -328,6 +328,130 @@ form.filter-grid > button:hover {
   margin-bottom: 4px;
 }
 
+.warehouse-summary-row td {
+  vertical-align: middle;
+}
+
+.details-button {
+  background: var(--accent-soft);
+  border: 1px solid #caddf7;
+  border-radius: 5px;
+  color: var(--accent-dark);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+  min-width: 100px;
+  padding: 7px 12px;
+}
+
+.details-button:hover {
+  background: #dcecff;
+}
+
+.detail-table {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-collapse: collapse;
+  table-layout: fixed;
+  width: 100%;
+}
+
+.detail-table th,
+.detail-table td {
+  border-bottom: 1px solid var(--line);
+  border-right: 1px solid #edf1f6;
+  padding: 9px 10px;
+  text-align: left;
+}
+
+.detail-table th {
+  background: #f3f7fb;
+  color: #455367;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.detail-table tr:last-child td {
+  border-bottom: 0;
+}
+
+.not-applicable {
+  color: var(--muted);
+  font-weight: 600;
+}
+
+body.modal-open {
+  overflow: hidden;
+}
+
+.details-modal {
+  align-items: center;
+  background: rgba(20, 30, 45, 0.48);
+  bottom: 0;
+  display: flex;
+  justify-content: center;
+  left: 0;
+  padding: 24px;
+  position: fixed;
+  right: 0;
+  top: 0;
+  z-index: 2147483646;
+}
+
+.details-modal[hidden] {
+  display: none;
+}
+
+.details-dialog {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: var(--shadow-lg);
+  max-height: calc(100vh - 48px);
+  max-width: 1180px;
+  overflow: hidden;
+  width: 100%;
+}
+
+.details-dialog-head {
+  align-items: center;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  justify-content: space-between;
+  padding: 16px 18px;
+}
+
+.details-dialog-head h2 {
+  font-size: 17px;
+  margin: 0 0 3px;
+}
+
+.details-dialog-head p {
+  color: var(--muted);
+  margin: 0;
+}
+
+.modal-close {
+  align-items: center;
+  background: #f4f6f9;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  color: var(--text);
+  cursor: pointer;
+  display: flex;
+  font-size: 22px;
+  height: 34px;
+  justify-content: center;
+  width: 34px;
+}
+
+.details-dialog-content {
+  max-height: calc(100vh - 150px);
+  overflow: auto;
+  padding: 16px;
+}
+
 .group-cell {
   background: #fafcfe;
   border-right-color: var(--line-dark) !important;
@@ -409,7 +533,7 @@ form.filter-grid > button:hover {
 .summary-strip strong {
   color: var(--text);
   display: block;
-  font-size: 28px;
+  font-size: 20px;
   font-weight: 700;
   line-height: 1.1;
   margin-bottom: 4px;

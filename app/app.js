@@ -28,6 +28,11 @@ const el = {
   form: document.querySelector("#searchForm"),
   loadStock: document.querySelector("#loadStockButton"),
   loadingOverlay: document.querySelector("#loadingOverlay"),
+  detailsModal: document.querySelector("#detailsModal"),
+  detailsModalTitle: document.querySelector("#detailsModalTitle"),
+  detailsModalSubtitle: document.querySelector("#detailsModalSubtitle"),
+  detailsModalContent: document.querySelector("#detailsModalContent"),
+  closeDetailsModal: document.querySelector("#closeDetailsModal"),
   search: document.querySelector("#itemSearch"),
   itemResults: document.querySelector("#itemResults"),
   stockList: document.querySelector("#stockList"),
@@ -50,6 +55,18 @@ el.search.addEventListener("input", debounce(() => {
 
 el.loadStock.addEventListener("click", () => {
   loadItemMasterData();
+});
+
+el.closeDetailsModal.addEventListener("click", closeWarehouseDetails);
+el.detailsModal.addEventListener("click", (event) => {
+  if (event.target === el.detailsModal) {
+    closeWarehouseDetails();
+  }
+});
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && !el.detailsModal.hidden) {
+    closeWarehouseDetails();
+  }
 });
 
 resetView("Click Load Stock to load item master.");
@@ -124,6 +141,7 @@ async function applyStockSearch(term) {
   }
 
   try {
+    state.selectedItem = selected;
     setStatus(`Loading LOCATION_STOCK1 for ${formatItemLabel(selected)}...`);
     resetView("Loading Location_Stock records...");
     state.allRows = await getAllRecords({
@@ -189,13 +207,14 @@ function renderItemSuggestions(term) {
     return `${item} ${sku}`.toLowerCase().includes(searchText);
   });
 
-  matches.slice(0, 12).forEach(({ item, sku }) => {
+  matches.slice(0, 12).forEach((itemRecord) => {
+    const { item, sku } = itemRecord;
     const button = document.createElement("button");
     button.type = "button";
     button.className = "item-button";
     button.innerHTML = `<span>${escapeHtml(item)}</span><span class="item-code">${escapeHtml(sku)}</span>`;
     button.addEventListener("click", () => {
-      state.selectedItem = { item, sku };
+      state.selectedItem = itemRecord;
       el.search.value = formatItemLabel(state.selectedItem);
       el.itemResults.innerHTML = "";
       resetView("Click Apply to fetch LOCATION_STOCK1 and show grouped stock.");
@@ -386,13 +405,37 @@ function normalizeItemRows(rows) {
     }
     const key = `${item}::${sku}`;
     if (!uniqueItems.has(key)) {
-      uniqueItems.set(key, { item: item || sku, sku });
+      uniqueItems.set(key, {
+        item: item || sku,
+        sku,
+        tiles: booleanValue(row.Tiles),
+        multiUnit: booleanValue(row.Multi_Unit),
+        unitMap: buildUnitMap(row.Tiles_Information),
+      });
     }
   });
 
   return Array.from(uniqueItems.values()).sort((a, b) => {
     return `${a.item} ${a.sku}`.localeCompare(`${b.item} ${b.sku}`);
   });
+}
+
+function booleanValue(value) {
+  return normalizeText(normalizeDisplay(value)) === "true";
+}
+
+function buildUnitMap(rows) {
+  const unitMap = {};
+
+  (Array.isArray(rows) ? rows : []).forEach((row) => {
+    const unit = normalizeText(normalizeDisplay(row?.Package_Type?.Unit || row?.Package_Type));
+    const multiplier = toNumber(row?.NOS);
+    if (unit && multiplier > 0) {
+      unitMap[unit] = multiplier;
+    }
+  });
+
+  return unitMap;
 }
 
 function uniqueValues(values) {
@@ -407,134 +450,82 @@ function renderStock(groups) {
   el.stockList.innerHTML = "";
 
   if (!groups.length) {
-    el.stockList.innerHTML = `<tr><td colspan="6" class="matrix-empty">No stock rows found.</td></tr>`;
+    el.stockList.innerHTML = `<tr><td colspan="4" class="matrix-empty">No stock rows found.</td></tr>`;
     updateSummary([]);
     return;
   }
 
   groups.forEach((group) => {
     const warehouseTotal = sumRows(group.rows, CONFIG.fields.available);
-    const uom = displayByCandidates(group.rows[0], CONFIG.fields.uom, "");
-    const locationRows = Array.from(group.locations.values());
-    const tableRows = buildGroupedTableRows(group, locationRows, warehouseTotal, uom);
-    tableRows.forEach((row) => el.stockList.appendChild(row));
+    const summaryRow = document.createElement("tr");
+    summaryRow.className = "warehouse-summary-row";
+    summaryRow.innerHTML = `
+      <td><strong class="warehouse-title">${escapeHtml(group.warehouse)}</strong></td>
+      <td><strong class="stock-number">${formatNos(warehouseTotal)}</strong></td>
+      <td>${formatBoxes(warehouseTotal)}</td>
+      <td>
+        <button type="button" class="details-button">View Details</button>
+      </td>
+    `;
+
+    summaryRow.querySelector(".details-button").addEventListener("click", () => {
+      openWarehouseDetails(group, warehouseTotal);
+    });
+
+    el.stockList.appendChild(summaryRow);
   });
 
-  el.stockList.appendChild(renderGrandTotalRow(groups));
   updateSummary(groups);
 }
 
-function buildGroupedTableRows(group, locations, warehouseTotal, uom) {
-  const rowCount = locations.reduce((count, location) => {
-    return count + Math.max(Array.from(location.batches.values()).length, 1);
-  }, 0);
-  let isFirstWarehouseRow = true;
+function openWarehouseDetails(group, warehouseTotal) {
+  el.detailsModalTitle.textContent = group.warehouse;
+  el.detailsModalSubtitle.textContent = `${formatNos(warehouseTotal)} / ${formatBoxes(warehouseTotal)}`;
+  el.detailsModalContent.innerHTML = renderWarehouseDetails(group);
+  el.detailsModal.hidden = false;
+  document.body.classList.add("modal-open");
+  el.closeDetailsModal.focus();
+}
+
+function closeWarehouseDetails() {
+  el.detailsModal.hidden = true;
+  document.body.classList.remove("modal-open");
+}
+
+function renderWarehouseDetails(group) {
   const rows = [];
 
-  locations.forEach((location) => {
+  Array.from(group.locations.values()).forEach((location) => {
     const batches = Array.from(location.batches.values());
-    const locationRowspan = Math.max(batches.length, 1);
-    let isFirstLocationRow = true;
-
-    (batches.length ? batches : [{ batch: "-", available: 0 }]).forEach((batch) => {
-      rows.push(renderStockDetailRow({
-        warehouse: group.warehouse,
-        warehouseTotal,
-        warehouseRowspan: rowCount,
-        showWarehouse: isFirstWarehouseRow,
-        location: location.location,
-        locationTotal: location.available,
-        locationRowspan,
-        showLocation: isFirstLocationRow,
-        batch: batch.batch,
-        batchTotal: batch.available,
-        uom,
-      }));
-      isFirstWarehouseRow = false;
-      isFirstLocationRow = false;
+    (batches.length ? batches : [{ batch: "-", available: 0 }]).forEach((batch, index) => {
+      rows.push(`
+        <tr>
+          <td>${index === 0 ? escapeHtml(location.location) : ""}</td>
+          <td>${index === 0 ? formatNos(location.available) : ""}</td>
+          <td>${index === 0 ? formatBoxes(location.available) : ""}</td>
+          <td>${escapeHtml(batch.batch)}</td>
+          <td>${formatNos(batch.available)}</td>
+          <td>${formatBoxes(batch.available)}</td>
+        </tr>
+      `);
     });
   });
 
-  return rows;
-}
-
-function renderStockDetailRow(detail) {
-  const row = document.createElement("tr");
-  const warehouseCells = detail.showWarehouse ? `
-    <td rowspan="${detail.warehouseRowspan}" class="group-cell">
-      <strong class="warehouse-title">${escapeHtml(detail.warehouse)}</strong>
-    </td>
-    <td rowspan="${detail.warehouseRowspan}" class="group-cell">
-      <strong class="stock-number">${numberText(detail.warehouseTotal)} ${escapeHtml(detail.uom)}</strong>
-    </td>
-  ` : "";
-  const locationCells = detail.showLocation ? `
-    <td rowspan="${detail.locationRowspan}">
-      ${escapeHtml(detail.location)}
-    </td>
-    <td rowspan="${detail.locationRowspan}">
-      <strong class="stock-number">${numberText(detail.locationTotal)} ${escapeHtml(detail.uom)}</strong>
-    </td>
-  ` : "";
-
-  row.innerHTML = `
-    ${warehouseCells}
-    ${locationCells}
-    <td>${escapeHtml(detail.batch)}</td>
-    <td><strong class="stock-number">${numberText(detail.batchTotal)} ${escapeHtml(detail.uom)}</strong></td>
-  `;
-  return row;
-}
-
-function renderLocationTable(rows, uom) {
-  if (!rows.length) {
-    return `<p class="empty">No location stock found.</p>`;
-  }
-
   return `
-    <table class="mini-table">
-      <thead><tr><th>Location</th><th>Actual Stock</th></tr></thead>
-      <tbody>
-        ${rows.map((row) => `<tr><td>${escapeHtml(row.location)}</td><td>${numberText(row.available)} ${escapeHtml(uom)}</td></tr>`).join("")}
-        <tr class="mini-total"><td>Total</td><td>${numberText(sumValues(rows, "available"))} ${escapeHtml(uom)}</td></tr>
-      </tbody>
+    <table class="detail-table">
+      <thead>
+        <tr>
+          <th>Location</th>
+          <th>Location Stock (Nos)</th>
+          <th>Location Stock (Boxes)</th>
+          <th>Batch</th>
+          <th>Batch Stock (Nos)</th>
+          <th>Batch Stock (Boxes)</th>
+        </tr>
+      </thead>
+      <tbody>${rows.join("")}</tbody>
     </table>
   `;
-}
-
-function renderBatchTable(rows, uom) {
-  if (!rows.length) {
-    return `<p class="empty">No batch stock found.</p>`;
-  }
-
-  return `
-    <table class="mini-table">
-      <thead><tr><th>Location</th><th>Batch</th><th>Batch Stock</th></tr></thead>
-      <tbody>
-        ${rows.map((row) => `<tr><td>${escapeHtml(row.location)}</td><td>${escapeHtml(row.batch)}</td><td>${numberText(row.available)} ${escapeHtml(uom)}</td></tr>`).join("")}
-        <tr class="mini-total"><td colspan="2">Total</td><td>${numberText(sumValues(rows, "available"))} ${escapeHtml(uom)}</td></tr>
-      </tbody>
-    </table>
-  `;
-}
-
-function renderGrandTotalRow(groups) {
-  const total = groups.reduce((sum, group) => sum + sumRows(group.rows, CONFIG.fields.available), 0);
-  const firstRow = groups.find((group) => group.rows.length)?.rows[0];
-  const uom = firstRow ? displayByCandidates(firstRow, CONFIG.fields.uom, "") : "";
-  const locationTotal = groups.reduce((sum, group) => sum + group.locations.size, 0);
-  const batchTotal = groups.reduce((sum, group) => sum + Array.from(group.locations.values()).reduce((locationSum, location) => locationSum + location.batches.size, 0), 0);
-  const row = document.createElement("tr");
-  row.className = "grand-total-row";
-  row.innerHTML = `
-    <td>Grand Total</td>
-    <td>${numberText(total)} ${escapeHtml(uom)}</td>
-    <td>${locationTotal} location${locationTotal === 1 ? "" : "s"}</td>
-    <td>${numberText(total)} ${escapeHtml(uom)}</td>
-    <td>${batchTotal} batch${batchTotal === 1 ? "" : "es"}</td>
-    <td>${numberText(total)} ${escapeHtml(uom)}</td>
-  `;
-  return row;
 }
 
 function updateSummary(groups) {
@@ -542,14 +533,14 @@ function updateSummary(groups) {
   const locationTotal = groups.reduce((sum, group) => sum + group.locations.size, 0);
   const batchTotal = groups.reduce((sum, group) => sum + Array.from(group.locations.values()).reduce((locationSum, location) => locationSum + location.batches.size, 0), 0);
 
-  el.totalAvailable.textContent = numberText(total);
+  el.totalAvailable.textContent = boxFactor() ? `${formatNos(total)} / ${formatBoxes(total)}` : formatNos(total);
   el.warehouseCount.textContent = groups.length;
   el.locationCount.textContent = locationTotal;
   el.batchCount.textContent = batchTotal;
 }
 
 function resetView(message = "Loading stock rows...") {
-  el.stockList.innerHTML = `<tr><td colspan="6" class="matrix-empty">${escapeHtml(message)}</td></tr>`;
+  el.stockList.innerHTML = `<tr><td colspan="4" class="matrix-empty">${escapeHtml(message)}</td></tr>`;
   updateSummary([]);
 }
 
@@ -579,6 +570,32 @@ function sumRows(rows, candidates) {
 
 function sumValues(rows, field) {
   return rows.reduce((sum, row) => sum + toNumber(row[field]), 0);
+}
+
+function boxFactor() {
+  const item = state.selectedItem;
+  if (!item?.tiles || !item?.multiUnit) {
+    return 0;
+  }
+  return toNumber(item.unitMap?.box);
+}
+
+function formatNos(quantity) {
+  return `${numberText(quantity)} Nos`;
+}
+
+function formatBoxes(quantity) {
+  const factor = boxFactor();
+  if (!factor) {
+    return "N/A";
+  }
+
+  const totalNos = toNumber(quantity);
+  const fullBoxes = Math.floor(totalNos / factor);
+  const looseNos = totalNos - (fullBoxes * factor);
+  const boxLabel = `${numberText(fullBoxes)} ${fullBoxes === 1 ? "Box" : "Boxes"}`;
+
+  return looseNos > 0 ? `${boxLabel}, ${numberText(looseNos)} Nos` : boxLabel;
 }
 
 function valueByCandidates(record, candidates) {
