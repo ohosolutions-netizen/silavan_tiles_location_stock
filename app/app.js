@@ -149,7 +149,7 @@ async function applyStockSearch(term) {
     setStatus(`Loading stock data for ${formatItemLabel(selected)}...`);
     resetView("Loading stock records...");
 
-    const criteria = buildItemCriteria(selected);
+    const criteria = buildSkuCriteria(selected);
 
     const [locationRows, apiStockRows] = await Promise.all([
       getAllRecords({ report_name: CONFIG.sourceReport, criteria, field_config: "all", max_records: 200 }),
@@ -275,23 +275,20 @@ function groupRows(rows) {
   return Array.from(warehouses.values());
 }
 
-function buildItemCriteria(selected) {
+function buildSkuCriteria(selected) {
+  if (!selected.sku) return "";
   const escape = (v) => String(v || "").replace(/\\/g, "\\\\").replace(/"/g, '\\"');
-  const parts = [];
-  if (selected.item) parts.push(`ITEM_NAME == "${escape(selected.item)}"`);
-  if (selected.sku) parts.push(`SKU == "${escape(selected.sku)}"`);
-  return parts.join(" || ");
+  return `SKU == "${escape(selected.sku)}"`;
 }
 
 async function getAllRecordsFiltered(reportName, selected) {
-  const candidateFields = CONFIG.stockItemFields || ["Item_Name", "ITEM_NAME", "Item", "item_name"];
+  const candidateFields = CONFIG.stockSkuFields || ["SKU", "Item_Code", "ITEM_CODE", "Code"];
   const escape = (v) => String(v || "").replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+  const value = selected.sku || selected.item;
 
   for (const field of candidateFields) {
-    const parts = [];
-    if (selected.item) parts.push(`${field} == "${escape(selected.item)}"`);
-    if (!parts.length) break;
-    const criteria = parts.join(" || ");
+    if (!value) break;
+    const criteria = `${field} == "${escape(value)}"`;
     try {
       return await getAllRecords({ report_name: reportName, criteria, field_config: "all", max_records: 1000 });
     } catch (err) {
