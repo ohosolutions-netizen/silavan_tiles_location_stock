@@ -4,6 +4,7 @@ const CONFIG = {
     "API_ITEM_MASTER",
   ],
   sourceReport: "LOCATION_STOCK1",
+  stockReport: "API_STOCKS",
   fields: {
     item: ["ITEM_NAME", "Item", "Item_Name", "ITEM", "Product", "Product_Name", "SKU"],
     sku: ["SKU", "Item_Code", "ITEM_CODE", "Code"],
@@ -11,7 +12,8 @@ const CONFIG = {
     location: ["Location", "Location_Name", "LOCATION", "Bin", "Rack"],
     batch: ["BATCH_NO", "Batch", "Batch_No", "Batch_Number", "BATCH", "Batch_Name"],
     expiry: ["Expiry_Date", "Expiry", "EXPIRY_DATE"],
-    available: ["Available_Stock", "Available_Qty", "Stock", "Quantity", "Qty", "QTY"],
+    pAvailable: ["P_Available_Stock"],
+    actual: ["Actual_Stock"],
     reserved: ["Reserved_Stock", "Reserved_Qty", "Reserved"],
     uom: ["UOM", "Unit", "Units"],
   },
@@ -20,6 +22,7 @@ const CONFIG = {
 const state = {
   items: [],
   allRows: [],
+  locationGroups: [],
   itemMasterLoaded: false,
   selectedItem: null,
 };
@@ -37,6 +40,7 @@ const el = {
   itemResults: document.querySelector("#itemResults"),
   stockList: document.querySelector("#stockList"),
   status: document.querySelector("#status"),
+  dataSource: document.querySelector("#dataSource"),
   totalAvailable: document.querySelector("#totalAvailable"),
   warehouseCount: document.querySelector("#warehouseCount"),
   locationCount: document.querySelector("#locationCount"),
@@ -142,18 +146,31 @@ async function applyStockSearch(term) {
 
   try {
     state.selectedItem = selected;
-    setStatus(`Loading LOCATION_STOCK1 for ${formatItemLabel(selected)}...`);
-    resetView("Loading Location_Stock records...");
-    state.allRows = await getAllRecords({
-      report_name: CONFIG.sourceReport,
-      field_config: "all",
-      max_records: 1000,
-    });
-    const rows = state.allRows.filter((row) => rowMatchesSelectedItem(row, selected));
-    renderStock(groupRows(rows));
-    setStatus(rows.length ? `Showing ${rows.length} Location_Stock rows for ${formatItemLabel(selected)}.` : `No Location_Stock rows found for ${formatItemLabel(selected)}.`);
+    setStatus(`Loading stock data for ${formatItemLabel(selected)}...`);
+    resetView("Loading stock records...");
+
+    const criteria = buildItemCriteria(selected);
+
+    const [locationRows, apiStockRows] = await Promise.all([
+      getAllRecords({ report_name: CONFIG.sourceReport, criteria, field_config: "all", max_records: 200 }),
+      getAllRecordsFiltered(CONFIG.stockReport, selected),
+    ]);
+
+    state.allRows = locationRows;
+    const filteredLocation = locationRows.filter((row) => rowMatchesSelectedItem(row, selected));
+    const filteredApiStock = apiStockRows.filter((row) => rowMatchesSelectedItem(row, selected));
+
+    state.locationGroups = groupRows(filteredLocation);
+    const apiGroups = groupApiStockRows(filteredApiStock);
+
+    renderStock(apiGroups);
+    showDataSource(filteredLocation, filteredApiStock);
+    setStatus(filteredApiStock.length
+      ? `Showing ${filteredApiStock.length} rows for ${formatItemLabel(selected)}.`
+      : `No stock rows found for ${formatItemLabel(selected)}.`
+    );
   } catch (error) {
-    showError(error, "Unable to load LOCATION_STOCK1 data.");
+    showError(error, "Unable to load stock data.");
   }
 }
 
@@ -244,17 +261,60 @@ function groupRows(rows) {
     const location = displayByCandidates(row, CONFIG.fields.location, "Location not set");
     const batch = displayByCandidates(row, CONFIG.fields.batch, "Batch not set");
     const expiry = displayByCandidates(row, CONFIG.fields.expiry, "-");
-    const available = toNumber(valueByCandidates(row, CONFIG.fields.available));
+    const actual = toNumber(valueByCandidates(row, CONFIG.fields.actual));
 
     if (!group.locations.has(location)) {
-      group.locations.set(location, { location, available: 0, batches: new Map() });
+      group.locations.set(location, { location, actual: 0, batches: new Map() });
     }
 
     const locationGroup = group.locations.get(location);
-    locationGroup.available += available;
-    upsertQuantity(locationGroup.batches, `${batch}::${expiry}`, { location, batch, expiry, available });
+    locationGroup.actual += actual;
+    upsertQuantity(locationGroup.batches, `${batch}::${expiry}`, { location, batch, expiry, actual });
   });
 
+  return Array.from(warehouses.values());
+}
+
+function buildItemCriteria(selected) {
+  const escape = (v) => String(v || "").replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+  const parts = [];
+  if (selected.item) parts.push(`ITEM_NAME == "${escape(selected.item)}"`);
+  if (selected.sku) parts.push(`SKU == "${escape(selected.sku)}"`);
+  return parts.join(" || ");
+}
+
+async function getAllRecordsFiltered(reportName, selected) {
+  const candidateFields = CONFIG.stockItemFields || ["Item_Name", "ITEM_NAME", "Item", "item_name"];
+  const escape = (v) => String(v || "").replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+
+  for (const field of candidateFields) {
+    const parts = [];
+    if (selected.item) parts.push(`${field} == "${escape(selected.item)}"`);
+    if (!parts.length) break;
+    const criteria = parts.join(" || ");
+    try {
+      return await getAllRecords({ report_name: reportName, criteria, field_config: "all", max_records: 1000 });
+    } catch (err) {
+      if (err.message && (err.message.includes("does not exist") || err.message.includes("Invalid criteria"))) {
+        continue;
+      }
+      throw err;
+    }
+  }
+
+  return await getAllRecords({ report_name: reportName, field_config: "all", max_records: 1000 });
+}
+
+function groupApiStockRows(rows) {
+  const warehouses = new Map();
+  rows.forEach((row) => {
+    const warehouse = displayByCandidates(row, CONFIG.fields.warehouse, "Warehouse not set");
+    if (!warehouses.has(warehouse)) {
+      warehouses.set(warehouse, { warehouse, pAvailable: 0 });
+    }
+    const group = warehouses.get(warehouse);
+    group.pAvailable += toNumber(valueByCandidates(row, CONFIG.fields.pAvailable));
+  });
   return Array.from(warehouses.values());
 }
 
@@ -264,7 +324,7 @@ function upsertQuantity(map, key, next) {
     map.set(key, next);
     return;
   }
-  current.available += next.available || 0;
+  current.actual += next.actual || 0;
 }
 
 async function getAllRecords(config) {
@@ -446,42 +506,49 @@ function formatItemLabel({ item, sku }) {
   return sku ? `${item} - ${sku}` : item;
 }
 
-function renderStock(groups) {
+function renderStock(apiGroups) {
   el.stockList.innerHTML = "";
 
-  if (!groups.length) {
-    el.stockList.innerHTML = `<tr><td colspan="4" class="matrix-empty">No stock rows found.</td></tr>`;
+  if (!apiGroups.length) {
+    el.stockList.innerHTML = `<tr><td colspan="5" class="matrix-empty">No stock rows found.</td></tr>`;
     updateSummary([]);
     return;
   }
 
-  groups.forEach((group) => {
-    const warehouseTotal = sumRows(group.rows, CONFIG.fields.available);
+  apiGroups.forEach((group) => {
+    const locationGroup = state.locationGroups.find((g) => g.warehouse === group.warehouse);
+    const actualTotal = locationGroup
+      ? Array.from(locationGroup.locations.values()).reduce((sum, loc) => sum + loc.actual, 0)
+      : 0;
     const summaryRow = document.createElement("tr");
     summaryRow.className = "warehouse-summary-row";
     summaryRow.innerHTML = `
       <td><strong class="warehouse-title">${escapeHtml(group.warehouse)}</strong></td>
-      <td><strong class="stock-number">${formatNos(warehouseTotal)}</strong></td>
-      <td>${formatBoxes(warehouseTotal)}</td>
+      <td><strong class="stock-number">${formatNos(group.pAvailable)}</strong></td>
+      <td>${formatBoxes(group.pAvailable)}</td>
+      <td><strong class="actual-number">${formatNos(actualTotal)}</strong></td>
       <td>
         <button type="button" class="details-button">View Details</button>
       </td>
     `;
 
     summaryRow.querySelector(".details-button").addEventListener("click", () => {
-      openWarehouseDetails(group, warehouseTotal);
+      openWarehouseDetails(group);
     });
 
     el.stockList.appendChild(summaryRow);
   });
 
-  updateSummary(groups);
+  updateSummary(apiGroups);
 }
 
-function openWarehouseDetails(group, warehouseTotal) {
-  el.detailsModalTitle.textContent = group.warehouse;
-  el.detailsModalSubtitle.textContent = `${formatNos(warehouseTotal)} / ${formatBoxes(warehouseTotal)}`;
-  el.detailsModalContent.innerHTML = renderWarehouseDetails(group);
+function openWarehouseDetails(apiGroup) {
+  const locationGroup = state.locationGroups.find((g) => g.warehouse === apiGroup.warehouse);
+  el.detailsModalTitle.textContent = apiGroup.warehouse;
+  el.detailsModalSubtitle.textContent = `Available: ${formatNos(apiGroup.pAvailable)} / ${formatBoxes(apiGroup.pAvailable)}`;
+  el.detailsModalContent.innerHTML = locationGroup
+    ? renderWarehouseDetails(locationGroup)
+    : `<p style="padding:16px;color:#6b7c93">No location details found for this warehouse.</p>`;
   el.detailsModal.hidden = false;
   document.body.classList.add("modal-open");
   el.closeDetailsModal.focus();
@@ -497,15 +564,15 @@ function renderWarehouseDetails(group) {
 
   Array.from(group.locations.values()).forEach((location) => {
     const batches = Array.from(location.batches.values());
-    (batches.length ? batches : [{ batch: "-", available: 0 }]).forEach((batch, index) => {
+    (batches.length ? batches : [{ batch: "-", actual: 0 }]).forEach((batch, index) => {
       rows.push(`
         <tr>
           <td>${index === 0 ? escapeHtml(location.location) : ""}</td>
-          <td>${index === 0 ? formatNos(location.available) : ""}</td>
-          <td>${index === 0 ? formatBoxes(location.available) : ""}</td>
+          <td>${index === 0 ? formatNos(location.actual) : ""}</td>
+          <td>${index === 0 ? formatBoxes(location.actual) : ""}</td>
           <td>${escapeHtml(batch.batch)}</td>
-          <td>${formatNos(batch.available)}</td>
-          <td>${formatBoxes(batch.available)}</td>
+          <td>${formatNos(batch.actual)}</td>
+          <td>${formatBoxes(batch.actual)}</td>
         </tr>
       `);
     });
@@ -516,8 +583,8 @@ function renderWarehouseDetails(group) {
       <thead>
         <tr>
           <th>Location</th>
-          <th>Location Stock (Nos)</th>
-          <th>Location Stock (Boxes)</th>
+          <th>Actual Stock (Nos)</th>
+          <th>Actual Stock (Boxes)</th>
           <th>Batch</th>
           <th>Batch Stock (Nos)</th>
           <th>Batch Stock (Boxes)</th>
@@ -528,20 +595,33 @@ function renderWarehouseDetails(group) {
   `;
 }
 
-function updateSummary(groups) {
-  const total = groups.reduce((sum, group) => sum + sumRows(group.rows, CONFIG.fields.available), 0);
-  const locationTotal = groups.reduce((sum, group) => sum + group.locations.size, 0);
-  const batchTotal = groups.reduce((sum, group) => sum + Array.from(group.locations.values()).reduce((locationSum, location) => locationSum + location.batches.size, 0), 0);
+function updateSummary(apiGroups) {
+  const total = apiGroups.reduce((sum, g) => sum + g.pAvailable, 0);
+  const locationTotal = state.locationGroups.reduce((sum, g) => sum + g.locations.size, 0);
+  const batchTotal = state.locationGroups.reduce((sum, g) => sum + Array.from(g.locations.values()).reduce((s, loc) => s + loc.batches.size, 0), 0);
 
   el.totalAvailable.textContent = boxFactor() ? `${formatNos(total)} / ${formatBoxes(total)}` : formatNos(total);
-  el.warehouseCount.textContent = groups.length;
+  el.warehouseCount.textContent = apiGroups.length;
   el.locationCount.textContent = locationTotal;
   el.batchCount.textContent = batchTotal;
 }
 
 function resetView(message = "Loading stock rows...") {
-  el.stockList.innerHTML = `<tr><td colspan="4" class="matrix-empty">${escapeHtml(message)}</td></tr>`;
+  el.stockList.innerHTML = `<tr><td colspan="5" class="matrix-empty">${escapeHtml(message)}</td></tr>`;
+  state.locationGroups = [];
+  el.dataSource.hidden = true;
   updateSummary([]);
+}
+
+function showDataSource(locationRows, apiStockRows) {
+  const actualField = locationRows.length
+    ? CONFIG.fields.actual.find((f) => Object.prototype.hasOwnProperty.call(locationRows[0], f)) || "—"
+    : "—";
+  const pAvailField = apiStockRows.length
+    ? CONFIG.fields.pAvailable.find((f) => Object.prototype.hasOwnProperty.call(apiStockRows[0], f)) || "—"
+    : "—";
+  el.dataSource.textContent = `Available: ${CONFIG.stockReport} → ${pAvailField}  ·  Actual (popup): ${CONFIG.sourceReport} → ${actualField}`;
+  el.dataSource.hidden = false;
 }
 
 function setStatus(message, isError = false) {
