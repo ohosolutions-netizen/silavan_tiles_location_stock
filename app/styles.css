@@ -191,6 +191,18 @@ form.filter-grid > button:hover {
   color: #b91c1c;
 }
 
+.data-source {
+  background: var(--accent-soft);
+  border: 1px solid var(--line-dark);
+  border-radius: 5px;
+  color: var(--accent-dark);
+  display: inline-block;
+  font-size: 12px;
+  font-weight: 600;
+  margin: 8px 0 0;
+  padding: 4px 10px;
+}
+
 .item-results {
   background: #fff;
   border: 1px solid var(--line-dark);
@@ -248,6 +260,42 @@ form.filter-grid > button:hover {
   font-size: 13px;
   margin: 0;
   padding: 12px 14px;
+}
+
+.price-strip {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-top: 14px;
+}
+
+.price-strip[hidden] {
+  display: none;
+}
+
+.price-strip article {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+  padding: 16px 20px;
+}
+
+.price-strip span {
+  color: var(--muted);
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  margin-bottom: 6px;
+  text-transform: uppercase;
+}
+
+.price-strip strong {
+  color: var(--accent);
+  display: block;
+  font-size: 20px;
+  font-weight: 700;
 }
 
 .register-panel,
@@ -475,6 +523,11 @@ body.modal-open {
   font-weight: 700;
 }
 
+.actual-number {
+  color: #6b7c93;
+  font-weight: 700;
+}
+
 .mini-table {
   border-collapse: collapse;
   width: 100%;
@@ -514,7 +567,7 @@ body.modal-open {
 .summary-strip {
   display: grid;
   gap: 12px;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   margin-top: 14px;
 }
 

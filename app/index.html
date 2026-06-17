@@ -30,6 +30,21 @@
           <p id="status">Click Load Stock to load item master.</p>
         </section>
 
+        <section id="priceStrip" class="price-strip" hidden>
+          <article>
+            <span>Retail Price</span>
+            <strong id="priceR">—</strong>
+          </article>
+          <article>
+            <span>Wholesale Price</span>
+            <strong id="priceW">—</strong>
+          </article>
+          <article>
+            <span>Cost Price</span>
+            <strong id="priceC">—</strong>
+          </article>
+        </section>
+
         <section class="register-panel">
           <div class="section-head">
             <div>
@@ -42,14 +57,15 @@
               <thead>
                 <tr>
                   <th>Warehouse</th>
-                  <th>Warehouse Stock (Nos)</th>
-                  <th>Warehouse Stock (Boxes)</th>
+                  <th>Available (Nos)</th>
+                  <th>Available (Boxes)</th>
+                  <th>Actual Stock (Nos)</th>
                   <th>Details</th>
                 </tr>
               </thead>
               <tbody id="stockList">
                 <tr>
-                  <td colspan="4" class="matrix-empty">Click Load Stock to load item master.</td>
+                  <td colspan="5" class="matrix-empty">Click Load Stock to load item master.</td>
                 </tr>
               </tbody>
             </table>
@@ -60,7 +76,10 @@
           <article>
             <span>Total Available</span>
             <strong id="totalAvailable">0</strong>
-            <small>Total actual stock</small>
+          </article>
+          <article>
+            <span>Total Actual</span>
+            <strong id="totalActual">0</strong>
           </article>
           <article>
             <span>Warehouses</span>

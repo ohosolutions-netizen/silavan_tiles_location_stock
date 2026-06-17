@@ -7,7 +7,7 @@ const CONFIG = {
   stockReport: "API_STOCKS",
   fields: {
     item: ["ITEM_NAME", "Item", "Item_Name", "ITEM", "Product", "Product_Name", "SKU"],
-    sku: ["SKU", "Item_Code", "ITEM_CODE", "Code"],
+    sku: ["ITEM_NAME.Item_Code", "Item.Item_Code", "SKU", "Item_Code", "ITEM_CODE", "Code"],
     warehouse: ["Warehouse", "Warehouse_Name", "WAREHOUSE", "Godown", "Godown_Name"],
     location: ["Location", "Location_Name", "LOCATION", "Bin", "Rack"],
     batch: ["BATCH_NO", "Batch", "Batch_No", "Batch_Number", "BATCH", "Batch_Name"],
@@ -16,7 +16,11 @@ const CONFIG = {
     actual: ["Actual_Stock"],
     reserved: ["Reserved_Stock", "Reserved_Qty", "Reserved"],
     uom: ["UOM", "Unit", "Units"],
+    priceR: ["R_Price_Sellingprice"],
+    priceW: ["W_price_Sellingprice"],
+    priceC: ["C_Price_Sellingprice"],
   },
+  itemMasterSkuField: "Item_Code",
 };
 
 const state = {
@@ -40,8 +44,12 @@ const el = {
   itemResults: document.querySelector("#itemResults"),
   stockList: document.querySelector("#stockList"),
   status: document.querySelector("#status"),
-  dataSource: document.querySelector("#dataSource"),
+  priceStrip: document.querySelector("#priceStrip"),
+  priceR: document.querySelector("#priceR"),
+  priceW: document.querySelector("#priceW"),
+  priceC: document.querySelector("#priceC"),
   totalAvailable: document.querySelector("#totalAvailable"),
+  totalActual: document.querySelector("#totalActual"),
   warehouseCount: document.querySelector("#warehouseCount"),
   locationCount: document.querySelector("#locationCount"),
   batchCount: document.querySelector("#batchCount"),
@@ -76,6 +84,49 @@ document.addEventListener("keydown", (event) => {
 resetView("Click Load Stock to load item master.");
 setStatus("Click Load Stock to fetch API_ITEM_MASTER, then select an item and click Apply.");
 
+(async () => {
+  if (isLocalPreview()) return;
+  const autoCode = await getCreatorPageParam("item_code");
+  if (autoCode) {
+    await fetchStockByCode(autoCode);
+  }
+})();
+
+async function getCreatorPageParam(name) {
+  try {
+    const sdk = window.ZOHO?.CREATOR;
+    if (!sdk) return null;
+    if (typeof sdk.init === "function") {
+      await sdk.init();
+    }
+    if (sdk.UTIL?.getQueryParams) {
+      const params = await sdk.UTIL.getQueryParams();
+      if (params?.[name]) return String(params[name]);
+    }
+  } catch (_) {}
+  return null;
+}
+
+function getPageParam(name) {
+  try {
+    if (window.ZOHO?.CREATOR?.UTIL?.getQueryParams) {
+      const params = ZOHO.CREATOR.UTIL.getQueryParams();
+      if (params && params[name] !== undefined) return String(params[name]);
+    }
+  } catch (_) {}
+  // Search params
+  const sp = new URLSearchParams(window.location.search);
+  if (sp.has(name)) return sp.get(name);
+  // Creator puts params in hash: #Page:Name?key=value
+  const hash = window.location.hash;
+  const q = hash.indexOf("?");
+  if (q !== -1) {
+    const hp = new URLSearchParams(hash.slice(q + 1));
+    if (hp.has(name)) return hp.get(name);
+  }
+  return null;
+}
+
 function debounce(fn, wait) {
   let timer;
   return (...args) => {
@@ -84,7 +135,7 @@ function debounce(fn, wait) {
   };
 }
 
-async function loadItemMasterData() {
+async function loadItemMasterData(autoCode = null) {
   const startedAt = Date.now();
   try {
     setLoading(true);
@@ -105,6 +156,17 @@ async function loadItemMasterData() {
     el.loadStock.textContent = "Masters Loaded";
     el.loadStock.classList.add("is-loaded");
     setStatus(`Loaded ${state.items.length} item master record${state.items.length === 1 ? "" : "s"} from API_ITEM_MASTER.`);
+
+    if (autoCode) {
+      const match = state.items.find((item) => normalizeText(item.sku) === normalizeText(autoCode));
+      if (match) {
+        state.selectedItem = match;
+        el.search.value = formatItemLabel(match);
+        await applyStockSearch(el.search.value);
+      } else {
+        setStatus(`Item code "${autoCode}" not found in item master.`, true);
+      }
+    }
   } catch (error) {
     el.loadStock.textContent = "Load Stock";
     el.loadStock.classList.remove("is-loaded");
@@ -132,6 +194,71 @@ function filterItemMaster(term) {
   setStatus("Select item - item code from API_ITEM_MASTER, then click Apply.");
 }
 
+async function fetchItemPrice(code) {
+  try {
+    const escape = (v) => String(v || "").replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+    const criteria = `${CONFIG.itemMasterSkuField} == "${escape(code)}"`;
+    const rows = await getAllRecords({
+      report_name: CONFIG.itemMasterReports[0],
+      criteria,
+      field_config: "all",
+      max_records: 200,
+    });
+    return rows[0] || null;
+  } catch (_) {
+    return null;
+  }
+}
+
+function renderPrices(row) {
+  if (!row) {
+    el.priceStrip.hidden = true;
+    return;
+  }
+  const fmt = (v) => {
+    const n = toNumber(v);
+    return n ? `₹ ${n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "—";
+  };
+  el.priceR.textContent = fmt(valueByCandidates(row, CONFIG.fields.priceR));
+  el.priceW.textContent = fmt(valueByCandidates(row, CONFIG.fields.priceW));
+  el.priceC.textContent = fmt(valueByCandidates(row, CONFIG.fields.priceC));
+  el.priceStrip.hidden = false;
+}
+
+async function fetchStockByCode(code) {
+  try {
+    setStatus(`Loading stock for item code ${code}...`);
+    resetView("Loading stock records...");
+
+    const selected = { sku: code, item: code };
+    state.selectedItem = selected;
+
+    const criteria = buildSkuCriteria(selected);
+
+    const [locationRows, apiStockRows, priceRow] = await Promise.all([
+      getAllRecords({ report_name: CONFIG.sourceReport, criteria, field_config: "all", max_records: 200 }),
+      getAllRecordsFiltered(CONFIG.stockReport, selected),
+      fetchItemPrice(code),
+    ]);
+
+    state.allRows = locationRows;
+    const filteredLocation = locationRows.filter((row) => rowMatchesSelectedItem(row, selected));
+    const filteredApiStock = apiStockRows.filter((row) => rowMatchesSelectedItem(row, selected));
+
+    state.locationGroups = groupRows(filteredLocation);
+    const apiGroups = groupApiStockRows(filteredApiStock);
+
+    renderStock(apiGroups);
+    renderPrices(priceRow);
+    setStatus(filteredApiStock.length
+      ? `Showing stock for item code ${code}.`
+      : `No stock found for item code ${code}.`
+    );
+  } catch (error) {
+    showError(error, "Unable to load stock data.");
+  }
+}
+
 async function applyStockSearch(term) {
   if (!state.itemMasterLoaded) {
     setStatus("Click Load Stock to fetch API_ITEM_MASTER before applying.");
@@ -151,9 +278,10 @@ async function applyStockSearch(term) {
 
     const criteria = buildSkuCriteria(selected);
 
-    const [locationRows, apiStockRows] = await Promise.all([
+    const [locationRows, apiStockRows, priceRow] = await Promise.all([
       getAllRecords({ report_name: CONFIG.sourceReport, criteria, field_config: "all", max_records: 200 }),
       getAllRecordsFiltered(CONFIG.stockReport, selected),
+      fetchItemPrice(selected.sku),
     ]);
 
     state.allRows = locationRows;
@@ -164,7 +292,8 @@ async function applyStockSearch(term) {
     const apiGroups = groupApiStockRows(filteredApiStock);
 
     renderStock(apiGroups);
-    showDataSource(filteredLocation, filteredApiStock);
+    renderPrices(priceRow);
+
     setStatus(filteredApiStock.length
       ? `Showing ${filteredApiStock.length} rows for ${formatItemLabel(selected)}.`
       : `No stock rows found for ${formatItemLabel(selected)}.`
@@ -278,11 +407,11 @@ function groupRows(rows) {
 function buildSkuCriteria(selected) {
   if (!selected.sku) return "";
   const escape = (v) => String(v || "").replace(/\\/g, "\\\\").replace(/"/g, '\\"');
-  return `SKU == "${escape(selected.sku)}"`;
+  return `ITEM_NAME.Item_Code == "${escape(selected.sku)}"`;
 }
 
 async function getAllRecordsFiltered(reportName, selected) {
-  const candidateFields = CONFIG.stockSkuFields || ["SKU", "Item_Code", "ITEM_CODE", "Code"];
+  const candidateFields = CONFIG.stockSkuFields || ["Item.Item_Code", "ITEM_NAME.Item_Code", "SKU", "Item_Code"];
   const escape = (v) => String(v || "").replace(/\\/g, "\\\\").replace(/"/g, '\\"');
   const value = selected.sku || selected.item;
 
@@ -292,7 +421,8 @@ async function getAllRecordsFiltered(reportName, selected) {
     try {
       return await getAllRecords({ report_name: reportName, criteria, field_config: "all", max_records: 1000 });
     } catch (err) {
-      if (err.message && (err.message.includes("does not exist") || err.message.includes("Invalid criteria"))) {
+      const msg = err?.message || String(err);
+      if (msg.includes("does not exist") || msg.includes("Invalid criteria") || msg.includes("does not belong")) {
         continue;
       }
       throw err;
@@ -341,11 +471,19 @@ async function getAllRecords(config) {
       request.record_cursor = cursor;
     }
 
-    const response = await withTimeout(
-      window.ZOHO.CREATOR.DATA.getRecords(request),
-      10000,
-      `Creator API timed out while loading ${request.report_name}.`
-    );
+    let response;
+    try {
+      response = await withTimeout(
+        window.ZOHO.CREATOR.DATA.getRecords(request),
+        10000,
+        `Creator API timed out while loading ${request.report_name}.`
+      );
+    } catch (sdkErr) {
+      const msg = sdkErr?.message || sdkErr?.error?.message
+        || (typeof sdkErr === "string" ? sdkErr : JSON.stringify(sdkErr));
+      throw new Error(msg || `SDK error for ${request.report_name}`);
+    }
+
     if (response.code !== 3000) {
       throw new Error(response.message || `Creator API returned code ${response.code}`);
     }
@@ -594,10 +732,14 @@ function renderWarehouseDetails(group) {
 
 function updateSummary(apiGroups) {
   const total = apiGroups.reduce((sum, g) => sum + g.pAvailable, 0);
+  const actualTotal = state.locationGroups.reduce((sum, g) =>
+    sum + Array.from(g.locations.values()).reduce((s, loc) => s + loc.actual, 0), 0);
   const locationTotal = state.locationGroups.reduce((sum, g) => sum + g.locations.size, 0);
-  const batchTotal = state.locationGroups.reduce((sum, g) => sum + Array.from(g.locations.values()).reduce((s, loc) => s + loc.batches.size, 0), 0);
+  const batchTotal = state.locationGroups.reduce((sum, g) =>
+    sum + Array.from(g.locations.values()).reduce((s, loc) => s + loc.batches.size, 0), 0);
 
   el.totalAvailable.textContent = boxFactor() ? `${formatNos(total)} / ${formatBoxes(total)}` : formatNos(total);
+  el.totalActual.textContent = boxFactor() ? `${formatNos(actualTotal)} / ${formatBoxes(actualTotal)}` : formatNos(actualTotal);
   el.warehouseCount.textContent = apiGroups.length;
   el.locationCount.textContent = locationTotal;
   el.batchCount.textContent = batchTotal;
@@ -606,19 +748,8 @@ function updateSummary(apiGroups) {
 function resetView(message = "Loading stock rows...") {
   el.stockList.innerHTML = `<tr><td colspan="5" class="matrix-empty">${escapeHtml(message)}</td></tr>`;
   state.locationGroups = [];
-  el.dataSource.hidden = true;
+  el.priceStrip.hidden = true;
   updateSummary([]);
-}
-
-function showDataSource(locationRows, apiStockRows) {
-  const actualField = locationRows.length
-    ? CONFIG.fields.actual.find((f) => Object.prototype.hasOwnProperty.call(locationRows[0], f)) || "—"
-    : "—";
-  const pAvailField = apiStockRows.length
-    ? CONFIG.fields.pAvailable.find((f) => Object.prototype.hasOwnProperty.call(apiStockRows[0], f)) || "—"
-    : "—";
-  el.dataSource.textContent = `Available: ${CONFIG.stockReport} → ${pAvailField}  ·  Actual (popup): ${CONFIG.sourceReport} → ${actualField}`;
-  el.dataSource.hidden = false;
 }
 
 function setStatus(message, isError = false) {
