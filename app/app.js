@@ -29,6 +29,7 @@ const state = {
   locationGroups: [],
   itemMasterLoaded: false,
   selectedItem: null,
+  userProfile: null,
 };
 
 const el = {
@@ -87,10 +88,45 @@ setStatus("Click Load Stock to fetch API_ITEM_MASTER, then select an item and cl
 (async () => {
   if (isLocalPreview()) return;
   const autoCode = await getCreatorPageParam("item_code");
+  state.userProfile = await getCurrentUserProfile();
   if (autoCode) {
     await fetchStockByCode(autoCode);
   }
 })();
+
+const C_PRICE_PROFILES = new Set([
+  "ADMIN", "BILLING", "BRANCH ACCOUNTS", "BRANCH MANAGER", "COROPORATE ACCOUNTS", "PURCHASE",
+]);
+
+async function getCurrentUserProfile() {
+  try {
+    const sdk = window.ZOHO?.CREATOR;
+    if (!sdk) return null;
+    if (typeof sdk.init === "function") {
+      await sdk.init();
+    }
+    if (sdk.UTIL?.getInitParams) {
+      const params = await sdk.UTIL.getInitParams();
+      const raw =
+        params?.userProfile ||
+        params?.Profile ||
+        params?.profile ||
+        params?.userRole ||
+        params?.role;
+      if (raw) return String(raw).toUpperCase().trim();
+    }
+  } catch (_) {}
+  return null;
+}
+
+function applyPriceCardVisibility() {
+  const priceCArt = el.priceC?.closest("article");
+  if (!priceCArt) return;
+  const profile = state.userProfile;
+  const canSeeC = !profile || C_PRICE_PROFILES.has(profile);
+  priceCArt.hidden = !canSeeC;
+  el.priceStrip.style.gridTemplateColumns = canSeeC ? "" : "repeat(2, minmax(0, 1fr))";
+}
 
 async function getCreatorPageParam(name) {
   try {
@@ -223,6 +259,7 @@ function renderPrices(row) {
   el.priceW.textContent = fmt(valueByCandidates(row, CONFIG.fields.priceW));
   el.priceC.textContent = fmt(valueByCandidates(row, CONFIG.fields.priceC));
   el.priceStrip.hidden = false;
+  applyPriceCardVisibility();
 }
 
 async function fetchStockByCode(code) {
@@ -659,7 +696,7 @@ function renderStock(apiGroups) {
   el.stockList.innerHTML = "";
 
   if (!apiGroups.length) {
-    el.stockList.innerHTML = `<tr><td colspan="5" class="matrix-empty">No stock rows found.</td></tr>`;
+    el.stockList.innerHTML = `<tr><td colspan="6" class="matrix-empty">No stock rows found.</td></tr>`;
     updateSummary([]);
     return;
   }
@@ -673,9 +710,10 @@ function renderStock(apiGroups) {
     summaryRow.className = "warehouse-summary-row";
     summaryRow.innerHTML = `
       <td><strong class="warehouse-title">${escapeHtml(group.warehouse)}</strong></td>
-      <td><strong class="stock-number">${formatNos(group.pAvailable)}</strong></td>
+      <td class="actual-col-bg">${formatBoxes(actualTotal)}</td>
+      <td class="actual-col-bg"><strong class="actual-number">${formatNos(actualTotal)}</strong></td>
       <td>${formatBoxes(group.pAvailable)}</td>
-      <td><strong class="actual-number">${formatNos(actualTotal)}</strong></td>
+      <td><strong class="stock-number">${formatNos(group.pAvailable)}</strong></td>
       <td>
         <button type="button" class="details-button">View Details</button>
       </td>
@@ -712,8 +750,9 @@ function renderWarehouseDetails(group) {
   const rows = [];
 
   Array.from(group.locations.values()).forEach((location) => {
-    const batches = Array.from(location.batches.values());
-    (batches.length ? batches : [{ batch: "-", actual: 0 }]).forEach((batch, index) => {
+    if (location.actual === 0) return;
+    const batches = Array.from(location.batches.values()).filter((b) => b.actual !== 0);
+    (batches.length ? batches : [{ batch: "-", actual: location.actual }]).forEach((batch, index) => {
       rows.push(`
         <tr>
           <td>${index === 0 ? escapeHtml(location.location) : ""}</td>
@@ -760,7 +799,7 @@ function updateSummary(apiGroups) {
 }
 
 function resetView(message = "Loading stock rows...") {
-  el.stockList.innerHTML = `<tr><td colspan="5" class="matrix-empty">${escapeHtml(message)}</td></tr>`;
+  el.stockList.innerHTML = `<tr><td colspan="6" class="matrix-empty">${escapeHtml(message)}</td></tr>`;
   state.locationGroups = [];
   el.priceStrip.hidden = true;
   updateSummary([]);

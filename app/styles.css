@@ -334,6 +334,14 @@ form.filter-grid > button:hover {
   overflow-x: auto;
 }
 
+.actual-col-head {
+  background: #f0f4ff !important;
+}
+
+.actual-col-bg {
+  background: #f5f8ff;
+}
+
 .warehouse-matrix,
 .fetched-table {
   border-collapse: collapse;
