@@ -265,8 +265,6 @@ function renderPrices(row) {
 async function fetchStockViaFunction(code) {
   try {
     const sdk = window.ZOHO?.CREATOR;
-    if (!sdk) return null;
-    const sdk = window.ZOHO?.CREATOR;
     if (!sdk?.DATA?.invokeCustomApi) return null;
     let response;
     try {
