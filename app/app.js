@@ -266,15 +266,23 @@ async function fetchStockViaFunction(code) {
   try {
     const sdk = window.ZOHO?.CREATOR;
     if (!sdk) return null;
-    if (!sdk?.DATA?.invokeCustomApi) return null;
-    const response = await withTimeout(
-      sdk.DATA.invokeCustomApi({
-        function_name: "fetchStockForWidget",
-        arguments: JSON.stringify({ item_code: code }),
-      }),
-      30000,
-      "Function call timed out."
-    );
+    if (!sdk?.DATA?.invokeCustomApi) { console.log("[DEBUG] invokeCustomApi not found"); return null; }
+    console.log("[DEBUG] calling invokeCustomApi for", code);
+    let response;
+    try {
+      response = await withTimeout(
+        sdk.DATA.invokeCustomApi({
+          function_name: "fetchStockForWidget",
+          arguments: JSON.stringify({ item_code: code }),
+        }),
+        30000,
+        "Function call timed out."
+      );
+    } catch (callErr) {
+      console.log("[DEBUG] invokeCustomApi threw:", callErr?.responseText || callErr?.message || JSON.stringify(callErr));
+      return null;
+    }
+    console.log("[DEBUG] invokeCustomApi response:", JSON.stringify(response));
     if (response?.code === 3000 && response?.result) {
       const d = response.result;
       return {
@@ -283,7 +291,10 @@ async function fetchStockViaFunction(code) {
         priceRow: (d.priceRow && typeof d.priceRow === "object" && Object.keys(d.priceRow).length > 0) ? d.priceRow : null,
       };
     }
-  } catch (_) {}
+    console.log("[DEBUG] unexpected response shape, code:", response?.code);
+  } catch (e) {
+    console.log("[DEBUG] outer error:", e?.message || String(e));
+  }
   return null;
 }
 
