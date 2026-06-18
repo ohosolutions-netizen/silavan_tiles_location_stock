@@ -528,13 +528,13 @@ async function getAllRecords(config) {
       const raw = typeof sdkErr === "string" ? sdkErr : (sdkErr?.responseText || sdkErr?.message || JSON.stringify(sdkErr));
       try {
         const parsed = JSON.parse(raw);
-        if (parsed.code === 9280) return rows;
+        if (parsed.code === 9280 || parsed.code === 2898) return rows;
       } catch (_) {}
-      if (String(raw).includes("9280")) return rows;
+      if (String(raw).includes("9280") || String(raw).includes("2898")) return rows;
       throw new Error(raw || `SDK error for ${request.report_name}`);
     }
 
-    if (response.code === 9280) return rows;
+    if (response.code === 9280 || response.code === 2898) return rows;
     if (response.code !== 3000) {
       throw new Error(response.message || `Creator API returned code ${response.code}`);
     }
