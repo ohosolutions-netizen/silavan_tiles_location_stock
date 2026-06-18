@@ -292,10 +292,14 @@ async function fetchStockByCode(code) {
     const filteredApiStock = apiStockRows.filter((row) => rowMatchesSelectedItem(row, selected));
 
     state.locationGroups = groupRows(filteredLocation);
-    let apiGroups = groupApiStockRows(filteredApiStock);
-    if (!apiGroups.length && state.locationGroups.length) {
-      apiGroups = state.locationGroups.map((g) => ({ warehouse: g.warehouse, pAvailable: 0 }));
-    }
+    const apiGroups = groupApiStockRows(filteredApiStock);
+    const apiWarehouseSet = new Set(apiGroups.map((g) => g.warehouse));
+    state.locationGroups.forEach((g) => {
+      if (!apiWarehouseSet.has(g.warehouse)) {
+        apiGroups.push({ warehouse: g.warehouse, pAvailable: 0 });
+      }
+    });
+    apiGroups.sort((a, b) => a.warehouse.localeCompare(b.warehouse));
 
     renderStock(apiGroups);
     renderPrices(priceRow);
@@ -338,10 +342,14 @@ async function applyStockSearch(term) {
     const filteredApiStock = apiStockRows.filter((row) => rowMatchesSelectedItem(row, selected));
 
     state.locationGroups = groupRows(filteredLocation);
-    let apiGroups = groupApiStockRows(filteredApiStock);
-    if (!apiGroups.length && state.locationGroups.length) {
-      apiGroups = state.locationGroups.map((g) => ({ warehouse: g.warehouse, pAvailable: 0 }));
-    }
+    const apiGroups = groupApiStockRows(filteredApiStock);
+    const apiWarehouseSet = new Set(apiGroups.map((g) => g.warehouse));
+    state.locationGroups.forEach((g) => {
+      if (!apiWarehouseSet.has(g.warehouse)) {
+        apiGroups.push({ warehouse: g.warehouse, pAvailable: 0 });
+      }
+    });
+    apiGroups.sort((a, b) => a.warehouse.localeCompare(b.warehouse));
 
     renderStock(apiGroups);
     renderPrices(priceRow);
