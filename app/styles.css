@@ -330,6 +330,13 @@ form.filter-grid > button:hover {
   padding: 4px 12px;
 }
 
+#pageItemName {
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 700;
+  margin: 4px 0 0;
+}
+
 .stock-table-wrap {
   overflow-x: auto;
 }

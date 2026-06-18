@@ -35,6 +35,7 @@ const state = {
 const el = {
   form: document.querySelector("#searchForm"),
   loadStock: document.querySelector("#loadStockButton"),
+  filterPanel: document.querySelector("#filterPanel"),
   loadingOverlay: document.querySelector("#loadingOverlay"),
   detailsModal: document.querySelector("#detailsModal"),
   detailsModalTitle: document.querySelector("#detailsModalTitle"),
@@ -54,6 +55,8 @@ const el = {
   warehouseCount: document.querySelector("#warehouseCount"),
   locationCount: document.querySelector("#locationCount"),
   batchCount: document.querySelector("#batchCount"),
+  pageItemName: document.querySelector("#pageItemName"),
+  sectionDesc: document.querySelector("#sectionDesc"),
 };
 
 el.form.addEventListener("submit", (event) => {
@@ -90,7 +93,16 @@ setStatus("Click Load Stock to fetch API_ITEM_MASTER, then select an item and cl
   const autoCode = await getCreatorPageParam("item_code");
   state.userProfile = await getCurrentUserProfile();
   if (autoCode) {
+    if (el.filterPanel) el.filterPanel.hidden = true;
+    if (el.sectionDesc) el.sectionDesc.hidden = true;
     await fetchStockByCode(autoCode);
+    if (el.pageItemName && state.selectedItem) {
+      const label = state.selectedItem.item && state.selectedItem.item !== autoCode
+        ? `${state.selectedItem.item} — ${autoCode}`
+        : autoCode;
+      el.pageItemName.textContent = label;
+      el.pageItemName.hidden = false;
+    }
   }
 })();
 
@@ -336,6 +348,16 @@ async function fetchStockByCode(code) {
             unitMap: { box: Math.round((pActual / pBox) * 100) / 100 },
           };
           break;
+        }
+      }
+    }
+
+    if (state.selectedItem.item === code) {
+      const nameRow = apiStockRows[0] || locationRows[0];
+      if (nameRow) {
+        const displayName = displayByCandidates(nameRow, CONFIG.fields.item, "");
+        if (displayName && displayName !== code) {
+          state.selectedItem = { ...state.selectedItem, item: displayName };
         }
       }
     }

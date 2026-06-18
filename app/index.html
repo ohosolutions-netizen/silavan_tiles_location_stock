@@ -17,7 +17,7 @@
           </div>
         </header>
 
-        <section class="filter-panel" aria-label="Item stock search">
+        <section id="filterPanel" class="filter-panel" aria-label="Item stock search">
           <form id="searchForm" class="filter-grid">
             <div class="field item-field">
               <label for="itemSearch">Item Name</label>
@@ -49,7 +49,8 @@
           <div class="section-head">
             <div>
               <h2>STOCK DETAILS</h2>
-              <p>Warehouse, location, and batch grouping for the selected item.</p>
+              <p id="pageItemName" hidden></p>
+              <p id="sectionDesc">Warehouse, location, and batch grouping for the selected item.</p>
             </div>
           </div>
           <div class="stock-table-wrap" aria-live="polite">
