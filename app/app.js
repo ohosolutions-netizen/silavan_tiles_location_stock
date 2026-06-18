@@ -270,9 +270,11 @@ async function fetchStockViaFunction(code) {
     try {
       response = await withTimeout(
         sdk.DATA.invokeCustomApi({
-          api_link_name: "fetchStockForWidget",
+          api_name: "fetchStockForWidget",
           http_method: "POST",
-          parameters: { item_code: code },
+          content_type: "application/json",
+          payload: { item_code: code },
+          public_key: "N0RNpJzy8CbAwK3sfrWRsJ7TS",
         }),
         30000,
         "Custom API timed out."
