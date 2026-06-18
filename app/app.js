@@ -268,7 +268,9 @@ async function fetchStockViaFunction(code) {
     if (!sdk) return null;
     const dataKeys = Object.keys(sdk.DATA || {}).join(", ") || "none";
     const utilKeys = Object.keys(sdk.UTIL || {}).join(", ") || "none";
-    setStatus(`DEBUG sdk.DATA:[${dataKeys}] sdk.UTIL:[${utilKeys}]`);
+    console.log("[DEBUG] sdk.DATA:", dataKeys);
+    console.log("[DEBUG] sdk.UTIL:", utilKeys);
+    console.log("[DEBUG] execute exists:", typeof sdk?.DATA?.execute);
     if (!sdk?.DATA?.execute) return null;
     const response = await withTimeout(
       sdk.DATA.execute({
@@ -278,7 +280,7 @@ async function fetchStockViaFunction(code) {
       30000,
       "Function call timed out."
     );
-    setStatus(`DEBUG fn response code:${response?.code} keys:${Object.keys(response || {}).join(",")}`);
+    console.log("[DEBUG] fn response:", JSON.stringify(response));
     if (response?.code === 3000 && response?.result) {
       const d = response.result;
       return {
@@ -288,7 +290,7 @@ async function fetchStockViaFunction(code) {
       };
     }
   } catch (e) {
-    setStatus(`DEBUG fn error: ${e?.message || String(e)}`, true);
+    console.log("[DEBUG] fn error:", e?.message || String(e));
   }
   return null;
 }
