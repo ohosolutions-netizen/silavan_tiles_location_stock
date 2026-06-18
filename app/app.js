@@ -265,6 +265,10 @@ function renderPrices(row) {
 async function fetchStockViaFunction(code) {
   try {
     const sdk = window.ZOHO?.CREATOR;
+    if (!sdk) return null;
+    const dataKeys = Object.keys(sdk.DATA || {}).join(", ") || "none";
+    const utilKeys = Object.keys(sdk.UTIL || {}).join(", ") || "none";
+    setStatus(`DEBUG sdk.DATA:[${dataKeys}] sdk.UTIL:[${utilKeys}]`);
     if (!sdk?.DATA?.execute) return null;
     const response = await withTimeout(
       sdk.DATA.execute({
@@ -274,6 +278,7 @@ async function fetchStockViaFunction(code) {
       30000,
       "Function call timed out."
     );
+    setStatus(`DEBUG fn response code:${response?.code} keys:${Object.keys(response || {}).join(",")}`);
     if (response?.code === 3000 && response?.result) {
       const d = response.result;
       return {
@@ -282,7 +287,9 @@ async function fetchStockViaFunction(code) {
         priceRow: (d.priceRow && typeof d.priceRow === "object" && Object.keys(d.priceRow).length > 0) ? d.priceRow : null,
       };
     }
-  } catch (_) {}
+  } catch (e) {
+    setStatus(`DEBUG fn error: ${e?.message || String(e)}`, true);
+  }
   return null;
 }
 
