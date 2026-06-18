@@ -266,21 +266,15 @@ async function fetchStockViaFunction(code) {
   try {
     const sdk = window.ZOHO?.CREATOR;
     if (!sdk) return null;
-    const dataKeys = Object.keys(sdk.DATA || {}).join(", ") || "none";
-    const utilKeys = Object.keys(sdk.UTIL || {}).join(", ") || "none";
-    console.log("[DEBUG] sdk.DATA:", dataKeys);
-    console.log("[DEBUG] sdk.UTIL:", utilKeys);
-    console.log("[DEBUG] execute exists:", typeof sdk?.DATA?.execute);
-    if (!sdk?.DATA?.execute) return null;
+    if (!sdk?.DATA?.invokeCustomApi) return null;
     const response = await withTimeout(
-      sdk.DATA.execute({
+      sdk.DATA.invokeCustomApi({
         function_name: "fetchStockForWidget",
         arguments: JSON.stringify({ item_code: code }),
       }),
       30000,
       "Function call timed out."
     );
-    console.log("[DEBUG] fn response:", JSON.stringify(response));
     if (response?.code === 3000 && response?.result) {
       const d = response.result;
       return {
@@ -289,9 +283,7 @@ async function fetchStockViaFunction(code) {
         priceRow: (d.priceRow && typeof d.priceRow === "object" && Object.keys(d.priceRow).length > 0) ? d.priceRow : null,
       };
     }
-  } catch (e) {
-    console.log("[DEBUG] fn error:", e?.message || String(e));
-  }
+  } catch (_) {}
   return null;
 }
 
