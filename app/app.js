@@ -292,7 +292,10 @@ async function fetchStockByCode(code) {
     const filteredApiStock = apiStockRows.filter((row) => rowMatchesSelectedItem(row, selected));
 
     state.locationGroups = groupRows(filteredLocation);
-    const apiGroups = groupApiStockRows(filteredApiStock);
+    let apiGroups = groupApiStockRows(filteredApiStock);
+    if (!apiGroups.length && state.locationGroups.length) {
+      apiGroups = state.locationGroups.map((g) => ({ warehouse: g.warehouse, pAvailable: 0 }));
+    }
 
     renderStock(apiGroups);
     renderPrices(priceRow);
@@ -335,7 +338,10 @@ async function applyStockSearch(term) {
     const filteredApiStock = apiStockRows.filter((row) => rowMatchesSelectedItem(row, selected));
 
     state.locationGroups = groupRows(filteredLocation);
-    const apiGroups = groupApiStockRows(filteredApiStock);
+    let apiGroups = groupApiStockRows(filteredApiStock);
+    if (!apiGroups.length && state.locationGroups.length) {
+      apiGroups = state.locationGroups.map((g) => ({ warehouse: g.warehouse, pAvailable: 0 }));
+    }
 
     renderStock(apiGroups);
     renderPrices(priceRow);
