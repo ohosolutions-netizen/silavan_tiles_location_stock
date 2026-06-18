@@ -283,12 +283,12 @@ async function fetchStockViaFunction(code) {
       console.log("[DEBUG] invokeCustomApi error:", e?.responseText || e?.message || JSON.stringify(e));
       return null;
     }
-    console.log("[DEBUG] invokeCustomApi response:", JSON.stringify(response));
     if (response?.code === 3000 && response?.result) {
       const d = response.result;
+      const extractRows = (r) => Array.isArray(r) ? r : (Array.isArray(r?.data) ? r.data : []);
       return {
-        locationRows: Array.isArray(d.locationRows) ? d.locationRows : [],
-        apiStockRows: Array.isArray(d.apiStocks) ? d.apiStocks : [],
+        locationRows: extractRows(d.locationRows),
+        apiStockRows: extractRows(d.apiStocks),
         priceRow: (d.priceRow && typeof d.priceRow === "object" && Object.keys(d.priceRow).length > 0) ? d.priceRow : null,
       };
     }
