@@ -488,11 +488,16 @@ async function getAllRecords(config) {
         `Creator API timed out while loading ${request.report_name}.`
       );
     } catch (sdkErr) {
-      const msg = sdkErr?.message || sdkErr?.error?.message
-        || (typeof sdkErr === "string" ? sdkErr : JSON.stringify(sdkErr));
-      throw new Error(msg || `SDK error for ${request.report_name}`);
+      const raw = typeof sdkErr === "string" ? sdkErr : (sdkErr?.responseText || sdkErr?.message || JSON.stringify(sdkErr));
+      try {
+        const parsed = JSON.parse(raw);
+        if (parsed.code === 9280) return rows;
+      } catch (_) {}
+      if (String(raw).includes("9280")) return rows;
+      throw new Error(raw || `SDK error for ${request.report_name}`);
     }
 
+    if (response.code === 9280) return rows;
     if (response.code !== 3000) {
       throw new Error(response.message || `Creator API returned code ${response.code}`);
     }
