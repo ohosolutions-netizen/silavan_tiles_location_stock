@@ -266,17 +266,32 @@ async function fetchStockViaFunction(code) {
   try {
     const sdk = window.ZOHO?.CREATOR;
     if (!sdk) return null;
-    const apiUrl = `https://www.zohoapis.in/creator/custom/hidesigntiles/fetchStockForWidget?publickey=N0RNpJzy8CbAwK3sfrWRsJ7TS&item_code=${encodeURIComponent(code)}`;
-    const resp = await withTimeout(fetch(apiUrl), 30000, "Custom API timed out.");
-    if (!resp.ok) return null;
-    const json = await resp.json();
-    const d = json?.result ?? json;
-    if (!d || typeof d !== "object") return null;
-    return {
-      locationRows: Array.isArray(d.locationRows) ? d.locationRows : [],
-      apiStockRows: Array.isArray(d.apiStocks) ? d.apiStocks : [],
-      priceRow: (d.priceRow && typeof d.priceRow === "object" && Object.keys(d.priceRow).length > 0) ? d.priceRow : null,
-    };
+    const sdk = window.ZOHO?.CREATOR;
+    if (!sdk?.DATA?.invokeCustomApi) return null;
+    let response;
+    try {
+      response = await withTimeout(
+        sdk.DATA.invokeCustomApi({
+          api_link_name: "fetchStockForWidget",
+          http_method: "POST",
+          parameters: { item_code: code },
+        }),
+        30000,
+        "Custom API timed out."
+      );
+    } catch (e) {
+      console.log("[DEBUG] invokeCustomApi error:", e?.responseText || e?.message || JSON.stringify(e));
+      return null;
+    }
+    console.log("[DEBUG] invokeCustomApi response:", JSON.stringify(response));
+    if (response?.code === 3000 && response?.result) {
+      const d = response.result;
+      return {
+        locationRows: Array.isArray(d.locationRows) ? d.locationRows : [],
+        apiStockRows: Array.isArray(d.apiStocks) ? d.apiStocks : [],
+        priceRow: (d.priceRow && typeof d.priceRow === "object" && Object.keys(d.priceRow).length > 0) ? d.priceRow : null,
+      };
+    }
   } catch (_) {}
   return null;
 }
