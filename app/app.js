@@ -241,6 +241,15 @@ async function fetchStockByCode(code) {
       fetchItemPrice(code),
     ]);
 
+    if (priceRow) {
+      state.selectedItem = {
+        ...selected,
+        tiles: booleanValue(priceRow.Tiles),
+        multiUnit: booleanValue(priceRow.Multi_Unit),
+        unitMap: buildUnitMap(priceRow.Tiles_Information),
+      };
+    }
+
     state.allRows = locationRows;
     const filteredLocation = locationRows.filter((row) => rowMatchesSelectedItem(row, selected));
     const filteredApiStock = apiStockRows.filter((row) => rowMatchesSelectedItem(row, selected));
