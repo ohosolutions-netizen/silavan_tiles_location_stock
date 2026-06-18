@@ -352,7 +352,12 @@ async function fetchStockByCode(code) {
         apiGroups.push({ warehouse: g.warehouse, pAvailable: 0 });
       }
     });
-    apiGroups.sort((a, b) => a.warehouse.localeCompare(b.warehouse));
+    apiGroups.sort((a, b) => {
+      const aK = a.warehouse.toUpperCase().includes("KANJIPURA");
+      const bK = b.warehouse.toUpperCase().includes("KANJIPURA");
+      if (aK !== bK) return aK ? -1 : 1;
+      return a.warehouse.localeCompare(b.warehouse);
+    });
 
     renderStock(apiGroups);
     renderPrices(priceRow);
@@ -407,7 +412,12 @@ async function applyStockSearch(term) {
         apiGroups.push({ warehouse: g.warehouse, pAvailable: 0 });
       }
     });
-    apiGroups.sort((a, b) => a.warehouse.localeCompare(b.warehouse));
+    apiGroups.sort((a, b) => {
+      const aK = a.warehouse.toUpperCase().includes("KANJIPURA");
+      const bK = b.warehouse.toUpperCase().includes("KANJIPURA");
+      if (aK !== bK) return aK ? -1 : 1;
+      return a.warehouse.localeCompare(b.warehouse);
+    });
 
     renderStock(apiGroups);
     renderPrices(priceRow);
