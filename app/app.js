@@ -262,6 +262,30 @@ function renderPrices(row) {
   applyPriceCardVisibility();
 }
 
+async function fetchStockViaFunction(code) {
+  try {
+    const sdk = window.ZOHO?.CREATOR;
+    if (!sdk?.DATA?.execute) return null;
+    const response = await withTimeout(
+      sdk.DATA.execute({
+        function_name: "fetchStockForWidget",
+        arguments: JSON.stringify({ item_code: code }),
+      }),
+      30000,
+      "Function call timed out."
+    );
+    if (response?.code === 3000 && response?.result) {
+      const d = response.result;
+      return {
+        locationRows: Array.isArray(d.locationRows) ? d.locationRows : [],
+        apiStockRows: Array.isArray(d.apiStocks) ? d.apiStocks : [],
+        priceRow: (d.priceRow && typeof d.priceRow === "object" && Object.keys(d.priceRow).length > 0) ? d.priceRow : null,
+      };
+    }
+  } catch (_) {}
+  return null;
+}
+
 async function fetchStockByCode(code) {
   try {
     setStatus(`Loading stock for item code ${code}...`);
@@ -270,13 +294,18 @@ async function fetchStockByCode(code) {
     const selected = { sku: code, item: code };
     state.selectedItem = selected;
 
-    const criteria = buildSkuCriteria(selected);
-
-    const [locationRows, apiStockRows, priceRow] = await Promise.all([
-      getAllRecords({ report_name: CONFIG.sourceReport, criteria, field_config: "all", max_records: 200 }),
-      getAllRecordsFiltered(CONFIG.stockReport, selected),
-      fetchItemPrice(code),
-    ]);
+    let locationRows, apiStockRows, priceRow;
+    const fnData = await fetchStockViaFunction(code);
+    if (fnData) {
+      ({ locationRows, apiStockRows, priceRow } = fnData);
+    } else {
+      const criteria = buildSkuCriteria(selected);
+      [locationRows, apiStockRows, priceRow] = await Promise.all([
+        getAllRecords({ report_name: CONFIG.sourceReport, criteria, field_config: "all", max_records: 200 }),
+        getAllRecordsFiltered(CONFIG.stockReport, selected),
+        fetchItemPrice(code),
+      ]);
+    }
 
     if (priceRow) {
       state.selectedItem = {
@@ -329,13 +358,18 @@ async function applyStockSearch(term) {
     setStatus(`Loading stock data for ${formatItemLabel(selected)}...`);
     resetView("Loading stock records...");
 
-    const criteria = buildSkuCriteria(selected);
-
-    const [locationRows, apiStockRows, priceRow] = await Promise.all([
-      getAllRecords({ report_name: CONFIG.sourceReport, criteria, field_config: "all", max_records: 200 }),
-      getAllRecordsFiltered(CONFIG.stockReport, selected),
-      fetchItemPrice(selected.sku),
-    ]);
+    let locationRows, apiStockRows, priceRow;
+    const fnData = await fetchStockViaFunction(selected.sku);
+    if (fnData) {
+      ({ locationRows, apiStockRows, priceRow } = fnData);
+    } else {
+      const criteria = buildSkuCriteria(selected);
+      [locationRows, apiStockRows, priceRow] = await Promise.all([
+        getAllRecords({ report_name: CONFIG.sourceReport, criteria, field_config: "all", max_records: 200 }),
+        getAllRecordsFiltered(CONFIG.stockReport, selected),
+        fetchItemPrice(selected.sku),
+      ]);
+    }
 
     state.allRows = locationRows;
     const filteredLocation = locationRows.filter((row) => rowMatchesSelectedItem(row, selected));
