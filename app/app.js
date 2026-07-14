@@ -868,8 +868,8 @@ function renderWarehouseDetails(group) {
           <td>${index === 0 ? formatNos(location.actual) : ""}</td>
           <td>${index === 0 ? formatBoxes(location.actual) : ""}</td>
           <td>${escapeHtml(batch.batch)}</td>
-          <td>${formatNos(batch.actual)}</td>
-          <td>${formatBoxes(batch.actual)}</td>
+          <td>${batch.batch === "Batch not set" ? '<span class="not-applicable">N/A</span>' : formatNos(batch.actual)}</td>
+          <td>${batch.batch === "Batch not set" ? '<span class="not-applicable">N/A</span>' : formatBoxes(batch.actual)}</td>
         </tr>
       `);
     });
