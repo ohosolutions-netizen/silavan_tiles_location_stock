@@ -340,7 +340,7 @@ async function fetchStockByCode(code) {
       for (const row of apiStockRows) {
         const pActual = toNumber(row.P_Actual_Stock);
         const pBox = toNumber(row.P_Actual_Stock_BOX);
-        if (pActual > 0 && pBox > 0) {
+        if (pActual > 0 && pBox > 0 && pActual > pBox) {
           state.selectedItem = {
             ...selected,
             tiles: true,
