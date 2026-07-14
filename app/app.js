@@ -427,6 +427,31 @@ async function applyStockSearch(term) {
       ]);
     }
 
+    if (priceRow) {
+      state.selectedItem = {
+        ...selected,
+        tiles: booleanValue(priceRow.Tiles),
+        multiUnit: booleanValue(priceRow.Multi_Unit),
+        unitMap: buildUnitMap(priceRow.Tiles_Information),
+      };
+    }
+
+    const needsBoxFallback2 = !priceRow || (state.selectedItem.tiles && !state.selectedItem.unitMap?.box);
+    if (needsBoxFallback2) {
+      for (const row of apiStockRows) {
+        const pActual = toNumber(row.P_Actual_Stock);
+        const pBox = toNumber(row.P_Actual_Stock_BOX);
+        if (pActual > 0 && pBox > 0) {
+          const factor = Math.round((pActual / pBox) * 100) / 100;
+          state.selectedItem = {
+            ...(!priceRow ? { ...selected, tiles: true, multiUnit: true } : state.selectedItem),
+            unitMap: { ...(state.selectedItem.unitMap || {}), box: factor },
+          };
+          break;
+        }
+      }
+    }
+
     state.allRows = locationRows;
     const filteredLocation = locationRows.filter((row) => rowMatchesSelectedItem(row, selected));
     const filteredApiStock = apiStockRows.filter((row) => rowMatchesSelectedItem(row, selected));
