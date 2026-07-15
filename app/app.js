@@ -16,8 +16,6 @@ const CONFIG = {
     actual: ["Actual_Stock"],
     reserved: ["Reserved_Stock", "Reserved_Qty", "Reserved"],
     uom: ["UOM", "Unit", "Units"],
-    priceW: ["W_price_Sellingprice"],
-    priceC: ["C_Price_Sellingprice"],
   },
   itemMasterSkuField: "Item_Code",
 };
@@ -28,7 +26,6 @@ const state = {
   locationGroups: [],
   itemMasterLoaded: false,
   selectedItem: null,
-  userProfile: null,
 };
 
 const el = {
@@ -45,9 +42,6 @@ const el = {
   itemResults: document.querySelector("#itemResults"),
   stockList: document.querySelector("#stockList"),
   status: document.querySelector("#status"),
-  priceStrip: document.querySelector("#priceStrip"),
-  priceW: document.querySelector("#priceW"),
-  priceC: document.querySelector("#priceC"),
   totalAvailable: document.querySelector("#totalAvailable"),
   totalActual: document.querySelector("#totalActual"),
   warehouseCount: document.querySelector("#warehouseCount"),
@@ -89,7 +83,6 @@ setStatus("Click Load Stock to fetch API_ITEM_MASTER, then select an item and cl
 (async () => {
   if (isLocalPreview()) return;
   const autoCode = await getCreatorPageParam("item_code");
-  state.userProfile = await getCurrentUserProfile();
   if (autoCode) {
     if (el.filterPanel) el.filterPanel.hidden = true;
     if (el.sectionDesc) el.sectionDesc.hidden = true;
@@ -103,40 +96,6 @@ setStatus("Click Load Stock to fetch API_ITEM_MASTER, then select an item and cl
     }
   }
 })();
-
-const C_PRICE_PROFILES = new Set([
-  "ADMIN", "BILLING", "BRANCH ACCOUNTS", "BRANCH MANAGER", "COROPORATE ACCOUNTS", "PURCHASE",
-]);
-
-async function getCurrentUserProfile() {
-  try {
-    const sdk = window.ZOHO?.CREATOR;
-    if (!sdk) return null;
-    if (typeof sdk.init === "function") {
-      await sdk.init();
-    }
-    if (sdk.UTIL?.getInitParams) {
-      const params = await sdk.UTIL.getInitParams();
-      const raw =
-        params?.userProfile ||
-        params?.Profile ||
-        params?.profile ||
-        params?.userRole ||
-        params?.role;
-      if (raw) return String(raw).toUpperCase().trim();
-    }
-  } catch (_) {}
-  return null;
-}
-
-function applyPriceCardVisibility() {
-  const priceCArt = el.priceC?.closest("article");
-  if (!priceCArt) return;
-  const profile = state.userProfile;
-  const canSeeC = !profile || C_PRICE_PROFILES.has(profile);
-  priceCArt.hidden = !canSeeC;
-  el.priceStrip.style.gridTemplateColumns = canSeeC ? "" : "repeat(1, minmax(0, 1fr))";
-}
 
 async function getCreatorPageParam(name) {
   try {
@@ -254,21 +213,6 @@ async function fetchItemPrice(code) {
   } catch (_) {
     return null;
   }
-}
-
-function renderPrices(row) {
-  if (!row) {
-    el.priceStrip.hidden = true;
-    return;
-  }
-  const fmt = (v) => {
-    const n = toNumber(v);
-    return n ? `₹ ${n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "—";
-  };
-  el.priceW.textContent = fmt(valueByCandidates(row, CONFIG.fields.priceW));
-  el.priceC.textContent = fmt(valueByCandidates(row, CONFIG.fields.priceC));
-  el.priceStrip.hidden = false;
-  applyPriceCardVisibility();
 }
 
 async function fetchStockViaFunction(code) {
@@ -398,7 +342,6 @@ async function fetchStockByCode(code) {
     });
 
     renderStock(apiGroups);
-    renderPrices(priceRow);
     setStatus(filteredApiStock.length
       ? `Showing stock for item code ${code}.`
       : `No stock found for item code ${code}.`
@@ -479,7 +422,6 @@ async function applyStockSearch(term) {
     });
 
     renderStock(apiGroups);
-    renderPrices(priceRow);
 
     setStatus(filteredApiStock.length
       ? `Showing ${filteredApiStock.length} rows for ${formatItemLabel(selected)}.`
@@ -949,7 +891,6 @@ function updateSummary(apiGroups) {
 function resetView(message = "Loading stock rows...") {
   el.stockList.innerHTML = `<tr><td colspan="6" class="matrix-empty">${escapeHtml(message)}</td></tr>`;
   state.locationGroups = [];
-  el.priceStrip.hidden = true;
   updateSummary([]);
 }
 
