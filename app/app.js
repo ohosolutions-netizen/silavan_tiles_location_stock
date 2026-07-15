@@ -298,10 +298,16 @@ async function fetchStockViaFunction(code) {
     if (response?.code === 3000 && response?.result) {
       const d = response.result;
       const extractRows = (r) => Array.isArray(r) ? r : (Array.isArray(r?.data) ? r.data : []);
+      const priceRow = (d.priceRow && typeof d.priceRow === "object" && Object.keys(d.priceRow).length > 0) ? d.priceRow : null;
+      const tilesInfo = Array.isArray(d.tilesInfo) ? d.tilesInfo
+        : Array.isArray(d.tilesInfo?.data) ? d.tilesInfo.data
+        : (priceRow && Array.isArray(priceRow.Tiles_Information)) ? priceRow.Tiles_Information
+        : [];
       return {
         locationRows: extractRows(d.locationRows),
         apiStockRows: extractRows(d.apiStocks),
-        priceRow: (d.priceRow && typeof d.priceRow === "object" && Object.keys(d.priceRow).length > 0) ? d.priceRow : null,
+        priceRow,
+        tilesInfo,
       };
     }
   } catch (_) {}
@@ -316,10 +322,10 @@ async function fetchStockByCode(code) {
     const selected = { sku: code, item: code };
     state.selectedItem = selected;
 
-    let locationRows, apiStockRows, priceRow;
+    let locationRows, apiStockRows, priceRow, tilesInfo;
     const fnData = await fetchStockViaFunction(code);
     if (fnData) {
-      ({ locationRows, apiStockRows, priceRow } = fnData);
+      ({ locationRows, apiStockRows, priceRow, tilesInfo } = fnData);
     } else {
       const criteria = buildSkuCriteria(selected);
       [locationRows, apiStockRows, priceRow] = await Promise.all([
@@ -334,7 +340,7 @@ async function fetchStockByCode(code) {
         ...selected,
         tiles: tristateBool(priceRow.Tiles),
         multiUnit: tristateBool(priceRow.Multi_Unit),
-        unitMap: buildUnitMap(priceRow.Tiles_Information),
+        unitMap: buildUnitMap(tilesInfo?.length ? tilesInfo : priceRow.Tiles_Information),
       };
     }
 
@@ -407,10 +413,10 @@ async function applyStockSearch(term) {
     setStatus(`Loading stock data for ${formatItemLabel(selected)}...`);
     resetView("Loading stock records...");
 
-    let locationRows, apiStockRows, priceRow;
+    let locationRows, apiStockRows, priceRow, tilesInfo;
     const fnData = await fetchStockViaFunction(selected.sku);
     if (fnData) {
-      ({ locationRows, apiStockRows, priceRow } = fnData);
+      ({ locationRows, apiStockRows, priceRow, tilesInfo } = fnData);
     } else {
       const criteria = buildSkuCriteria(selected);
       [locationRows, apiStockRows, priceRow] = await Promise.all([
@@ -425,7 +431,7 @@ async function applyStockSearch(term) {
         ...selected,
         tiles: tristateBool(priceRow.Tiles),
         multiUnit: tristateBool(priceRow.Multi_Unit),
-        unitMap: buildUnitMap(priceRow.Tiles_Information),
+        unitMap: buildUnitMap(tilesInfo?.length ? tilesInfo : priceRow.Tiles_Information),
       };
     }
 
