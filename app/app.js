@@ -922,8 +922,9 @@ function updateSummary(apiGroups) {
   const batchTotal = state.locationGroups.reduce((sum, g) =>
     sum + Array.from(g.locations.values()).reduce((s, loc) => s + loc.batches.size, 0), 0);
 
-  el.totalAvailable.textContent = boxFactor() ? `${formatNos(total)} / ${formatBoxes(total)}` : formatNos(total);
-  el.totalActual.textContent = boxFactor() ? `${formatNos(actualTotal)} / ${formatBoxes(actualTotal)}` : formatNos(actualTotal);
+  const showBox = !!state.selectedItem?.tiles;
+  el.totalAvailable.textContent = showBox ? `${formatNos(total)} / ${formatBoxes(total)}` : formatNos(total);
+  el.totalActual.textContent = showBox ? `${formatNos(actualTotal)} / ${formatBoxes(actualTotal)}` : formatNos(actualTotal);
   el.warehouseCount.textContent = apiGroups.length;
   el.locationCount.textContent = locationTotal;
   el.batchCount.textContent = batchTotal;
@@ -979,7 +980,7 @@ function formatNos(quantity) {
 function formatBoxes(quantity) {
   const factor = boxFactor();
   if (!factor) {
-    return "N/A";
+    return state.selectedItem?.tiles ? "0 Boxes" : "N/A";
   }
 
   const totalNos = toNumber(quantity);
