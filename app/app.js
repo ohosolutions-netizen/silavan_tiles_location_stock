@@ -338,20 +338,14 @@ async function fetchStockByCode(code) {
       };
     }
 
-    // Derive box factor from stock data only when tiles is confirmed true
-    // but Tiles_Information had no box unit entry
     if (state.selectedItem.tiles && !state.selectedItem.unitMap?.box) {
-      for (const row of apiStockRows) {
-        const pActual = toNumber(row.P_Actual_Stock);
-        const pBox = toNumber(row.P_Actual_Stock_BOX);
-        if (pActual > 0 && pBox > 0) {
-          state.selectedItem = {
-            ...state.selectedItem,
-            multiUnit: true,
-            unitMap: { ...(state.selectedItem.unitMap || {}), box: Math.round((pActual / pBox) * 100) / 100 },
-          };
-          break;
-        }
+      const factor = deriveBoxFactor(apiStockRows);
+      if (factor) {
+        state.selectedItem = {
+          ...state.selectedItem,
+          multiUnit: true,
+          unitMap: { ...(state.selectedItem.unitMap || {}), box: factor },
+        };
       }
     }
 
@@ -435,17 +429,13 @@ async function applyStockSearch(term) {
     }
 
     if (state.selectedItem.tiles && !state.selectedItem.unitMap?.box) {
-      for (const row of apiStockRows) {
-        const pActual = toNumber(row.P_Actual_Stock);
-        const pBox = toNumber(row.P_Actual_Stock_BOX);
-        if (pActual > 0 && pBox > 0) {
-          state.selectedItem = {
-            ...state.selectedItem,
-            multiUnit: true,
-            unitMap: { ...(state.selectedItem.unitMap || {}), box: Math.round((pActual / pBox) * 100) / 100 },
-          };
-          break;
-        }
+      const factor = deriveBoxFactor(apiStockRows);
+      if (factor) {
+        state.selectedItem = {
+          ...state.selectedItem,
+          multiUnit: true,
+          unitMap: { ...(state.selectedItem.unitMap || {}), box: factor },
+        };
       }
     }
 
@@ -963,6 +953,24 @@ function sumRows(rows, candidates) {
 
 function sumValues(rows, field) {
   return rows.reduce((sum, row) => sum + toNumber(row[field]), 0);
+}
+
+function deriveBoxFactor(apiStockRows) {
+  for (const row of apiStockRows) {
+    const pActual = toNumber(row.P_Actual_Stock);
+    const pBox = toNumber(row.P_Actual_Stock_BOX);
+    if (pActual > 0 && pBox > 0) {
+      return Math.round((pActual / pBox) * 100) / 100;
+    }
+  }
+  for (const row of apiStockRows) {
+    const pAvail = toNumber(row.P_Available_Stock);
+    const pAvailBox = toNumber(row.P_Available_Stock_BOX);
+    if (pAvail > 0 && pAvailBox > 0) {
+      return Math.round((pAvail / pAvailBox) * 100) / 100;
+    }
+  }
+  return 0;
 }
 
 function boxFactor() {
