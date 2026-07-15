@@ -338,19 +338,17 @@ async function fetchStockByCode(code) {
       };
     }
 
-    // Derive box factor from stock data when:
-    // (a) no priceRow at all, or
-    // (b) priceRow confirms tiles=true but Tiles_Information had no box unit
-    const needsBoxFallback = !priceRow || (state.selectedItem.tiles && !state.selectedItem.unitMap?.box);
-    if (needsBoxFallback) {
+    // Derive box factor from stock data only when tiles is confirmed true
+    // but Tiles_Information had no box unit entry
+    if (state.selectedItem.tiles && !state.selectedItem.unitMap?.box) {
       for (const row of apiStockRows) {
         const pActual = toNumber(row.P_Actual_Stock);
         const pBox = toNumber(row.P_Actual_Stock_BOX);
         if (pActual > 0 && pBox > 0) {
-          const factor = Math.round((pActual / pBox) * 100) / 100;
           state.selectedItem = {
-            ...(!priceRow ? { ...selected, tiles: true, multiUnit: true } : state.selectedItem),
-            unitMap: { ...(state.selectedItem.unitMap || {}), box: factor },
+            ...state.selectedItem,
+            multiUnit: true,
+            unitMap: { ...(state.selectedItem.unitMap || {}), box: Math.round((pActual / pBox) * 100) / 100 },
           };
           break;
         }
@@ -436,16 +434,15 @@ async function applyStockSearch(term) {
       };
     }
 
-    const needsBoxFallback2 = !priceRow || (state.selectedItem.tiles && !state.selectedItem.unitMap?.box);
-    if (needsBoxFallback2) {
+    if (state.selectedItem.tiles && !state.selectedItem.unitMap?.box) {
       for (const row of apiStockRows) {
         const pActual = toNumber(row.P_Actual_Stock);
         const pBox = toNumber(row.P_Actual_Stock_BOX);
         if (pActual > 0 && pBox > 0) {
-          const factor = Math.round((pActual / pBox) * 100) / 100;
           state.selectedItem = {
-            ...(!priceRow ? { ...selected, tiles: true, multiUnit: true } : state.selectedItem),
-            unitMap: { ...(state.selectedItem.unitMap || {}), box: factor },
+            ...state.selectedItem,
+            multiUnit: true,
+            unitMap: { ...(state.selectedItem.unitMap || {}), box: Math.round((pActual / pBox) * 100) / 100 },
           };
           break;
         }
