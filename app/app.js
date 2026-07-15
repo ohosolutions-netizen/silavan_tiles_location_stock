@@ -285,6 +285,7 @@ async function fetchStockViaFunction(code) {
           api_name: "fetchStockForWidget",
           http_method: "POST",
           content_type: "application/json",
+          query_params: { item_code: code },
           payload: { item_code: code },
           public_key: "N0RNpJzy8CbAwK3sfrWRsJ7TS",
         }),
