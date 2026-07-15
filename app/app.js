@@ -344,7 +344,7 @@ async function fetchStockByCode(code) {
       };
     }
 
-    if (state.selectedItem.tiles !== false && !state.selectedItem.unitMap?.box) {
+    if (state.selectedItem.tiles === true && !state.selectedItem.unitMap?.box) {
       const factor = deriveBoxFactor(apiStockRows);
       if (factor) {
         state.selectedItem = {
@@ -435,7 +435,7 @@ async function applyStockSearch(term) {
       };
     }
 
-    if (state.selectedItem.tiles !== false && !state.selectedItem.unitMap?.box) {
+    if (state.selectedItem.tiles === true && !state.selectedItem.unitMap?.box) {
       const factor = deriveBoxFactor(apiStockRows);
       if (factor) {
         state.selectedItem = {
@@ -926,7 +926,7 @@ function updateSummary(apiGroups) {
   const batchTotal = state.locationGroups.reduce((sum, g) =>
     sum + Array.from(g.locations.values()).reduce((s, loc) => s + loc.batches.size, 0), 0);
 
-  const showBox = state.selectedItem?.tiles !== false;
+  const showBox = state.selectedItem?.tiles === true;
   el.totalAvailable.textContent = showBox ? `${formatNos(total)} / ${formatBoxes(total)}` : formatNos(total);
   el.totalActual.textContent = showBox ? `${formatNos(actualTotal)} / ${formatBoxes(actualTotal)}` : formatNos(actualTotal);
   el.warehouseCount.textContent = apiGroups.length;
@@ -1002,7 +1002,7 @@ function formatNos(quantity) {
 function formatBoxes(quantity) {
   const factor = boxFactor();
   if (!factor) {
-    return state.selectedItem?.tiles === false ? "N/A" : "0 Boxes";
+    return state.selectedItem?.tiles === true ? "0 Boxes" : "N/A";
   }
 
   const totalNos = toNumber(quantity);
