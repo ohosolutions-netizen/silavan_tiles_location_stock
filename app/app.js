@@ -16,7 +16,6 @@ const CONFIG = {
     actual: ["Actual_Stock"],
     reserved: ["Reserved_Stock", "Reserved_Qty", "Reserved"],
     uom: ["UOM", "Unit", "Units"],
-    priceR: ["R_Price_Sellingprice"],
     priceW: ["W_price_Sellingprice"],
     priceC: ["C_Price_Sellingprice"],
   },
@@ -47,7 +46,6 @@ const el = {
   stockList: document.querySelector("#stockList"),
   status: document.querySelector("#status"),
   priceStrip: document.querySelector("#priceStrip"),
-  priceR: document.querySelector("#priceR"),
   priceW: document.querySelector("#priceW"),
   priceC: document.querySelector("#priceC"),
   totalAvailable: document.querySelector("#totalAvailable"),
@@ -137,7 +135,7 @@ function applyPriceCardVisibility() {
   const profile = state.userProfile;
   const canSeeC = !profile || C_PRICE_PROFILES.has(profile);
   priceCArt.hidden = !canSeeC;
-  el.priceStrip.style.gridTemplateColumns = canSeeC ? "" : "repeat(2, minmax(0, 1fr))";
+  el.priceStrip.style.gridTemplateColumns = canSeeC ? "" : "repeat(1, minmax(0, 1fr))";
 }
 
 async function getCreatorPageParam(name) {
@@ -267,7 +265,6 @@ function renderPrices(row) {
     const n = toNumber(v);
     return n ? `₹ ${n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "—";
   };
-  el.priceR.textContent = fmt(valueByCandidates(row, CONFIG.fields.priceR));
   el.priceW.textContent = fmt(valueByCandidates(row, CONFIG.fields.priceW));
   el.priceC.textContent = fmt(valueByCandidates(row, CONFIG.fields.priceC));
   el.priceStrip.hidden = false;
