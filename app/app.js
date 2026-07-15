@@ -298,7 +298,15 @@ async function fetchStockViaFunction(code) {
     if (response?.code === 3000 && response?.result) {
       const d = response.result;
       const extractRows = (r) => Array.isArray(r) ? r : (Array.isArray(r?.data) ? r.data : []);
-      const priceRow = (d.priceRow && typeof d.priceRow === "object" && Object.keys(d.priceRow).length > 0) ? d.priceRow : null;
+      // priceRow may arrive as a single record, OR as the raw getRecords
+      // response { code, data:[record] }, OR as a list of records. Unwrap all.
+      const extractOne = (r) => {
+        if (!r || typeof r !== "object") return null;
+        if (Array.isArray(r)) return r.length ? r[0] : null;
+        if (Array.isArray(r.data)) return r.data.length ? r.data[0] : null;
+        return Object.keys(r).length > 0 ? r : null;
+      };
+      const priceRow = extractOne(d.priceRow);
       const tilesInfo = Array.isArray(d.tilesInfo) ? d.tilesInfo
         : Array.isArray(d.tilesInfo?.data) ? d.tilesInfo.data
         : (priceRow && Array.isArray(priceRow.Tiles_Information)) ? priceRow.Tiles_Information
