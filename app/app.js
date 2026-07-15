@@ -335,6 +335,12 @@ async function fetchStockByCode(code) {
       ]);
     }
 
+    console.log("[DEBUG] priceRow keys:", priceRow ? Object.keys(priceRow) : null,
+      "| Tiles:", JSON.stringify(priceRow?.Tiles),
+      "| Multi_Unit:", JSON.stringify(priceRow?.Multi_Unit),
+      "| tilesInfo:", JSON.stringify(tilesInfo),
+      "| Tiles_Information:", JSON.stringify(priceRow?.Tiles_Information));
+
     if (priceRow) {
       state.selectedItem = {
         ...selected,
