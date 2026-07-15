@@ -332,17 +332,18 @@ async function fetchStockByCode(code) {
     if (priceRow) {
       state.selectedItem = {
         ...selected,
-        tiles: booleanValue(priceRow.Tiles),
-        multiUnit: booleanValue(priceRow.Multi_Unit),
+        tiles: tristateBool(priceRow.Tiles),
+        multiUnit: tristateBool(priceRow.Multi_Unit),
         unitMap: buildUnitMap(priceRow.Tiles_Information),
       };
     }
 
-    if (state.selectedItem.tiles && !state.selectedItem.unitMap?.box) {
+    if (state.selectedItem.tiles !== false && !state.selectedItem.unitMap?.box) {
       const factor = deriveBoxFactor(apiStockRows);
       if (factor) {
         state.selectedItem = {
           ...state.selectedItem,
+          tiles: true,
           multiUnit: true,
           unitMap: { ...(state.selectedItem.unitMap || {}), box: factor },
         };
@@ -422,17 +423,18 @@ async function applyStockSearch(term) {
     if (priceRow) {
       state.selectedItem = {
         ...selected,
-        tiles: booleanValue(priceRow.Tiles),
-        multiUnit: booleanValue(priceRow.Multi_Unit),
+        tiles: tristateBool(priceRow.Tiles),
+        multiUnit: tristateBool(priceRow.Multi_Unit),
         unitMap: buildUnitMap(priceRow.Tiles_Information),
       };
     }
 
-    if (state.selectedItem.tiles && !state.selectedItem.unitMap?.box) {
+    if (state.selectedItem.tiles !== false && !state.selectedItem.unitMap?.box) {
       const factor = deriveBoxFactor(apiStockRows);
       if (factor) {
         state.selectedItem = {
           ...state.selectedItem,
+          tiles: true,
           multiUnit: true,
           unitMap: { ...(state.selectedItem.unitMap || {}), box: factor },
         };
@@ -791,6 +793,12 @@ function booleanValue(value) {
   return normalizeText(normalizeDisplay(value)) === "true";
 }
 
+// Returns true/false when the field is present, undefined when the field is missing/null/empty.
+function tristateBool(value) {
+  if (value === undefined || value === null || value === "") return undefined;
+  return normalizeText(normalizeDisplay(value)) === "true";
+}
+
 function buildUnitMap(rows) {
   const unitMap = {};
 
@@ -912,7 +920,7 @@ function updateSummary(apiGroups) {
   const batchTotal = state.locationGroups.reduce((sum, g) =>
     sum + Array.from(g.locations.values()).reduce((s, loc) => s + loc.batches.size, 0), 0);
 
-  const showBox = !!state.selectedItem?.tiles;
+  const showBox = state.selectedItem?.tiles !== false;
   el.totalAvailable.textContent = showBox ? `${formatNos(total)} / ${formatBoxes(total)}` : formatNos(total);
   el.totalActual.textContent = showBox ? `${formatNos(actualTotal)} / ${formatBoxes(actualTotal)}` : formatNos(actualTotal);
   el.warehouseCount.textContent = apiGroups.length;
@@ -988,7 +996,7 @@ function formatNos(quantity) {
 function formatBoxes(quantity) {
   const factor = boxFactor();
   if (!factor) {
-    return state.selectedItem?.tiles ? "0 Boxes" : "N/A";
+    return state.selectedItem?.tiles === false ? "N/A" : "0 Boxes";
   }
 
   const totalNos = toNumber(quantity);
