@@ -375,6 +375,31 @@ form.filter-grid > button:hover {
   background: #dcecff;
 }
 
+.pending-so-section {
+  margin-top: 22px;
+}
+
+.pending-so-head {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.pending-so-head h3 {
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 700;
+  margin: 0;
+}
+
+.pending-so-note {
+  color: var(--muted);
+  font-size: 12px;
+  margin: 0 0 10px;
+}
+
 .detail-table {
   background: #fff;
   border: 1px solid var(--line);

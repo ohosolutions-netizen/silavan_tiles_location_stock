@@ -26,6 +26,7 @@ const state = {
   locationGroups: [],
   itemMasterLoaded: false,
   selectedItem: null,
+  pendingByWarehouse: new Map(),
 };
 
 const el = {
@@ -258,6 +259,7 @@ async function fetchStockViaFunction(code) {
         apiStockRows: extractRows(d.apiStocks),
         priceRow,
         tilesInfo,
+        pendingSO: extractRows(d.pendingSO),
       };
     }
   } catch (_) {}
@@ -272,10 +274,10 @@ async function fetchStockByCode(code) {
     const selected = { sku: code, item: code };
     state.selectedItem = selected;
 
-    let locationRows, apiStockRows, priceRow, tilesInfo;
+    let locationRows, apiStockRows, priceRow, tilesInfo, pendingSO;
     const fnData = await fetchStockViaFunction(code);
     if (fnData) {
-      ({ locationRows, apiStockRows, priceRow, tilesInfo } = fnData);
+      ({ locationRows, apiStockRows, priceRow, tilesInfo, pendingSO } = fnData);
     } else {
       const criteria = buildSkuCriteria(selected);
       [locationRows, apiStockRows, priceRow] = await Promise.all([
@@ -284,6 +286,7 @@ async function fetchStockByCode(code) {
         fetchItemPrice(code),
       ]);
     }
+    state.pendingByWarehouse = groupPendingByWarehouse(pendingSO);
 
     console.log("[DEBUG] priceRow keys:", priceRow ? Object.keys(priceRow) : null,
       "| Tiles:", JSON.stringify(priceRow?.Tiles),
@@ -368,10 +371,10 @@ async function applyStockSearch(term) {
     setStatus(`Loading stock data for ${formatItemLabel(selected)}...`);
     resetView("Loading stock records...");
 
-    let locationRows, apiStockRows, priceRow, tilesInfo;
+    let locationRows, apiStockRows, priceRow, tilesInfo, pendingSO;
     const fnData = await fetchStockViaFunction(selected.sku);
     if (fnData) {
-      ({ locationRows, apiStockRows, priceRow, tilesInfo } = fnData);
+      ({ locationRows, apiStockRows, priceRow, tilesInfo, pendingSO } = fnData);
     } else {
       const criteria = buildSkuCriteria(selected);
       [locationRows, apiStockRows, priceRow] = await Promise.all([
@@ -380,6 +383,7 @@ async function applyStockSearch(term) {
         fetchItemPrice(selected.sku),
       ]);
     }
+    state.pendingByWarehouse = groupPendingByWarehouse(pendingSO);
 
     if (priceRow) {
       state.selectedItem = {
@@ -581,6 +585,25 @@ function upsertQuantity(map, key, next) {
     return;
   }
   current.actual += next.actual || 0;
+}
+
+// Groups the Custom API's pendingSO rows by warehouse. Each row is already
+// normalized server-side to { warehouse, soNumber, pending, customer, orderDate }.
+function groupPendingByWarehouse(pendingRows) {
+  const byWarehouse = new Map();
+  (Array.isArray(pendingRows) ? pendingRows : []).forEach((row) => {
+    const warehouse = normalizeDisplay(row?.warehouse) || "Warehouse not set";
+    const pending = toNumber(row?.pending);
+    if (pending === 0) return;
+    if (!byWarehouse.has(warehouse)) byWarehouse.set(warehouse, []);
+    byWarehouse.get(warehouse).push({
+      soNumber: normalizeDisplay(row?.soNumber) || "-",
+      pending,
+      customer: normalizeDisplay(row?.customer) || "",
+      orderDate: normalizeDisplay(row?.orderDate) || "",
+    });
+  });
+  return byWarehouse;
 }
 
 async function getAllRecords(config) {
@@ -822,12 +845,52 @@ function openWarehouseDetails(apiGroup) {
   const locationGroup = state.locationGroups.find((g) => g.warehouse === apiGroup.warehouse);
   el.detailsModalTitle.textContent = apiGroup.warehouse;
   el.detailsModalSubtitle.textContent = `Available: ${formatNos(apiGroup.pAvailable)} / ${formatBoxes(apiGroup.pAvailable)}`;
-  el.detailsModalContent.innerHTML = locationGroup
+  const detailsHtml = locationGroup
     ? renderWarehouseDetails(locationGroup)
     : `<p style="padding:16px;color:#6b7c93">No location details found for this warehouse.</p>`;
+  el.detailsModalContent.innerHTML = detailsHtml + renderPendingSO(apiGroup.warehouse);
   el.detailsModal.hidden = false;
   document.body.classList.add("modal-open");
   el.closeDetailsModal.focus();
+}
+
+function renderPendingSO(warehouse) {
+  const pending = state.pendingByWarehouse.get(warehouse) || [];
+  const totalPending = pending.reduce((sum, p) => sum + p.pending, 0);
+
+  const rows = pending.length
+    ? pending.map((p) => `
+        <tr>
+          <td>${escapeHtml(p.soNumber)}</td>
+          <td>${p.customer ? escapeHtml(p.customer) : "—"}</td>
+          <td>${p.orderDate ? escapeHtml(p.orderDate) : "—"}</td>
+          <td>${formatNos(p.pending)}</td>
+          <td>${formatBoxes(p.pending)}</td>
+        </tr>
+      `).join("")
+    : `<tr><td colspan="5" class="matrix-empty">No pending sales orders for this warehouse.</td></tr>`;
+
+  return `
+    <div class="pending-so-section">
+      <div class="pending-so-head">
+        <h3>Pending Sales Orders</h3>
+        <span class="row-badge">Total pending: ${formatNos(totalPending)}${boxFactor() ? ` / ${formatBoxes(totalPending)}` : ""}</span>
+      </div>
+      <p class="pending-so-note">These pending SO quantities are reserved against actual stock, reducing the available quantity for this branch.</p>
+      <table class="detail-table">
+        <thead>
+          <tr>
+            <th>SO Number</th>
+            <th>Customer</th>
+            <th>Order Date</th>
+            <th>Pending (Nos)</th>
+            <th>Pending (Boxes)</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+  `;
 }
 
 function closeWarehouseDetails() {
@@ -891,6 +954,7 @@ function updateSummary(apiGroups) {
 function resetView(message = "Loading stock rows...") {
   el.stockList.innerHTML = `<tr><td colspan="6" class="matrix-empty">${escapeHtml(message)}</td></tr>`;
   state.locationGroups = [];
+  state.pendingByWarehouse = new Map();
   updateSummary([]);
 }
 
