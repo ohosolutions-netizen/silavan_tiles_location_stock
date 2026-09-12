@@ -234,7 +234,7 @@ async function fetchStockViaFunction(code) {
         "Custom API timed out."
       );
     } catch (e) {
-      console.log("[DEBUG] invokeCustomApi error:", e?.responseText || e?.message || JSON.stringify(e));
+      console.warn("invokeCustomApi failed, falling back to direct fetch:", e?.responseText || e?.message || JSON.stringify(e));
       return null;
     }
     if (response?.code === 3000 && response?.result) {
@@ -249,7 +249,6 @@ async function fetchStockViaFunction(code) {
         return Object.keys(r).length > 0 ? r : null;
       };
       const priceRow = extractOne(d.priceRow);
-      console.log("[DEBUG] pendingSO raw:", JSON.stringify(d.pendingSO));
       const tilesInfo = Array.isArray(d.tilesInfo) ? d.tilesInfo
         : Array.isArray(d.tilesInfo?.data) ? d.tilesInfo.data
         : (priceRow && Array.isArray(priceRow.Tiles_Information)) ? priceRow.Tiles_Information
@@ -287,12 +286,6 @@ async function fetchStockByCode(code) {
       ]);
     }
     state.pendingByWarehouse = groupPendingByWarehouse(pendingSO);
-
-    console.log("[DEBUG] priceRow keys:", priceRow ? Object.keys(priceRow) : null,
-      "| Tiles:", JSON.stringify(priceRow?.Tiles),
-      "| Multi_Unit:", JSON.stringify(priceRow?.Multi_Unit),
-      "| tilesInfo:", JSON.stringify(tilesInfo),
-      "| Tiles_Information:", JSON.stringify(priceRow?.Tiles_Information));
 
     if (priceRow) {
       state.selectedItem = {
