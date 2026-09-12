@@ -250,6 +250,7 @@ async function fetchStockViaFunction(code) {
         return Object.keys(r).length > 0 ? r : null;
       };
       const priceRow = extractOne(d.priceRow);
+      console.log("[DEBUG] pendingSO raw:", JSON.stringify(d.pendingSO));
       const tilesInfo = Array.isArray(d.tilesInfo) ? d.tilesInfo
         : Array.isArray(d.tilesInfo?.data) ? d.tilesInfo.data
         : (priceRow && Array.isArray(priceRow.Tiles_Information)) ? priceRow.Tiles_Information
