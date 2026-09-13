@@ -221,24 +221,6 @@ async function fetchItemPrice(code) {
   }
 }
 
-// TEMP: renders raw debug data on the page so it can be read without the console.
-function showDebugPanel(data) {
-  let panel = document.querySelector("#debugPanel");
-  if (!panel) {
-    panel = document.createElement("pre");
-    panel.id = "debugPanel";
-    panel.style.cssText = "margin:16px;padding:12px;background:#1a2535;color:#7CFC00;font-size:11px;white-space:pre-wrap;word-break:break-all;border-radius:6px;max-height:340px;overflow:auto;";
-    document.querySelector(".shell")?.appendChild(panel);
-  }
-  let text;
-  try {
-    text = JSON.stringify(data, null, 2);
-  } catch (_) {
-    text = String(data);
-  }
-  panel.textContent = "[DEBUG] branchRequests raw:\n" + text;
-}
-
 async function fetchStockViaFunction(code) {
   try {
     const sdk = window.ZOHO?.CREATOR;
@@ -272,7 +254,6 @@ async function fetchStockViaFunction(code) {
         return Object.keys(r).length > 0 ? r : null;
       };
       const priceRow = extractOne(d.priceRow);
-      showDebugPanel(d.branchRequests);
       const tilesInfo = Array.isArray(d.tilesInfo) ? d.tilesInfo
         : Array.isArray(d.tilesInfo?.data) ? d.tilesInfo.data
         : (priceRow && Array.isArray(priceRow.Tiles_Information)) ? priceRow.Tiles_Information
@@ -626,15 +607,41 @@ function groupPendingByWarehouse(pendingRows) {
   return byWarehouse;
 }
 
-// Normalizes the Custom API's branchRequests rows (already filtered to the
-// item + pending, server-side) to { requestNo, fromBranch, quantity, date }.
+// A branch-request Line_Item lookup display_value looks like:
+//   "ST/0273  TEST ONE ASARVA 1200X600 PLAIN WHITE G15001(2)SP - 99 2.00"
+// i.e. "...<item name> - <item_code> <qty>". The last two tokens are the
+// item code and quantity.
+function parseBranchLine(text) {
+  const tokens = String(normalizeDisplay(text)).trim().split(/\s+/);
+  if (tokens.length < 2) return { code: "", qty: 0 };
+  const qty = parseFloat(tokens[tokens.length - 1]);
+  return { code: tokens[tokens.length - 2], qty: isNaN(qty) ? 0 : qty };
+}
+
+// Each Custom API branchRequests row is { requestNo, fromBranch, date, lines:[display_value] }.
+// Parse each line, keep only the ones for the currently selected item, and sum the qty.
 function normalizeBranchRequests(rows) {
-  return (Array.isArray(rows) ? rows : []).map((row) => ({
-    requestNo: normalizeDisplay(row?.requestNo) || "-",
-    fromBranch: normalizeDisplay(row?.fromBranch) || "",
-    quantity: toNumber(row?.quantity),
-    date: normalizeDisplay(row?.date) || "",
-  })).filter((r) => r.quantity !== 0);
+  const itemCode = normalizeText(state.selectedItem?.sku || "");
+  const out = [];
+  (Array.isArray(rows) ? rows : []).forEach((row) => {
+    const lines = Array.isArray(row?.lines) ? row.lines : [];
+    let qty = 0;
+    lines.forEach((line) => {
+      const parsed = parseBranchLine(line);
+      if (parsed.code && normalizeText(parsed.code) === itemCode) {
+        qty += parsed.qty;
+      }
+    });
+    if (qty !== 0) {
+      out.push({
+        requestNo: normalizeDisplay(row?.requestNo) || "-",
+        fromBranch: normalizeDisplay(row?.fromBranch) || "",
+        quantity: qty,
+        date: normalizeDisplay(row?.date) || "",
+      });
+    }
+  });
+  return out;
 }
 
 async function getAllRecords(config) {
