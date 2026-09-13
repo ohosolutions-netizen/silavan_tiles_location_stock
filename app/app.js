@@ -27,7 +27,12 @@ const state = {
   itemMasterLoaded: false,
   selectedItem: null,
   pendingByWarehouse: new Map(),
+  branchRequests: [],
 };
+
+// Head Office branch — branch requests are fulfilled here, so they only
+// appear in this warehouse's detail modal.
+const HO_WAREHOUSE = "HI DESIGN (KANJIPURA MALAPPURAM)";
 
 const el = {
   form: document.querySelector("#searchForm"),
@@ -249,6 +254,7 @@ async function fetchStockViaFunction(code) {
         return Object.keys(r).length > 0 ? r : null;
       };
       const priceRow = extractOne(d.priceRow);
+      console.log("[DEBUG] branchRequests raw:", JSON.stringify(d.branchRequests));
       const tilesInfo = Array.isArray(d.tilesInfo) ? d.tilesInfo
         : Array.isArray(d.tilesInfo?.data) ? d.tilesInfo.data
         : (priceRow && Array.isArray(priceRow.Tiles_Information)) ? priceRow.Tiles_Information
@@ -259,6 +265,7 @@ async function fetchStockViaFunction(code) {
         priceRow,
         tilesInfo,
         pendingSO: extractRows(d.pendingSO),
+        branchRequests: extractRows(d.branchRequests),
       };
     }
   } catch (_) {}
@@ -273,10 +280,10 @@ async function fetchStockByCode(code) {
     const selected = { sku: code, item: code };
     state.selectedItem = selected;
 
-    let locationRows, apiStockRows, priceRow, tilesInfo, pendingSO;
+    let locationRows, apiStockRows, priceRow, tilesInfo, pendingSO, branchRequests;
     const fnData = await fetchStockViaFunction(code);
     if (fnData) {
-      ({ locationRows, apiStockRows, priceRow, tilesInfo, pendingSO } = fnData);
+      ({ locationRows, apiStockRows, priceRow, tilesInfo, pendingSO, branchRequests } = fnData);
     } else {
       const criteria = buildSkuCriteria(selected);
       [locationRows, apiStockRows, priceRow] = await Promise.all([
@@ -286,6 +293,7 @@ async function fetchStockByCode(code) {
       ]);
     }
     state.pendingByWarehouse = groupPendingByWarehouse(pendingSO);
+    state.branchRequests = normalizeBranchRequests(branchRequests);
 
     if (priceRow) {
       state.selectedItem = {
@@ -364,10 +372,10 @@ async function applyStockSearch(term) {
     setStatus(`Loading stock data for ${formatItemLabel(selected)}...`);
     resetView("Loading stock records...");
 
-    let locationRows, apiStockRows, priceRow, tilesInfo, pendingSO;
+    let locationRows, apiStockRows, priceRow, tilesInfo, pendingSO, branchRequests;
     const fnData = await fetchStockViaFunction(selected.sku);
     if (fnData) {
-      ({ locationRows, apiStockRows, priceRow, tilesInfo, pendingSO } = fnData);
+      ({ locationRows, apiStockRows, priceRow, tilesInfo, pendingSO, branchRequests } = fnData);
     } else {
       const criteria = buildSkuCriteria(selected);
       [locationRows, apiStockRows, priceRow] = await Promise.all([
@@ -377,6 +385,7 @@ async function applyStockSearch(term) {
       ]);
     }
     state.pendingByWarehouse = groupPendingByWarehouse(pendingSO);
+    state.branchRequests = normalizeBranchRequests(branchRequests);
 
     if (priceRow) {
       state.selectedItem = {
@@ -597,6 +606,17 @@ function groupPendingByWarehouse(pendingRows) {
     });
   });
   return byWarehouse;
+}
+
+// Normalizes the Custom API's branchRequests rows (already filtered to the
+// item + pending, server-side) to { requestNo, fromBranch, quantity, date }.
+function normalizeBranchRequests(rows) {
+  return (Array.isArray(rows) ? rows : []).map((row) => ({
+    requestNo: normalizeDisplay(row?.requestNo) || "-",
+    fromBranch: normalizeDisplay(row?.fromBranch) || "",
+    quantity: toNumber(row?.quantity),
+    date: normalizeDisplay(row?.date) || "",
+  })).filter((r) => r.quantity !== 0);
 }
 
 async function getAllRecords(config) {
@@ -841,7 +861,7 @@ function openWarehouseDetails(apiGroup) {
   const detailsHtml = locationGroup
     ? renderWarehouseDetails(locationGroup)
     : `<p style="padding:16px;color:#6b7c93">No location details found for this warehouse.</p>`;
-  el.detailsModalContent.innerHTML = detailsHtml + renderPendingSO(apiGroup.warehouse);
+  el.detailsModalContent.innerHTML = detailsHtml + renderPendingSO(apiGroup.warehouse) + renderBranchRequests(apiGroup.warehouse);
   el.detailsModal.hidden = false;
   document.body.classList.add("modal-open");
   el.closeDetailsModal.focus();
@@ -878,6 +898,49 @@ function renderPendingSO(warehouse) {
             <th>Order Date</th>
             <th>Pending (Nos)</th>
             <th>Pending (Boxes)</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+  `;
+}
+
+// Branch requests are fulfilled by the Head Office, so this section only
+// renders in the HO warehouse's modal.
+function renderBranchRequests(warehouse) {
+  if (normalizeText(warehouse) !== normalizeText(HO_WAREHOUSE)) return "";
+
+  const requests = state.branchRequests || [];
+  const totalQty = requests.reduce((sum, r) => sum + r.quantity, 0);
+
+  const rows = requests.length
+    ? requests.map((r) => `
+        <tr>
+          <td>${escapeHtml(r.requestNo)}</td>
+          <td>${r.fromBranch ? escapeHtml(r.fromBranch) : "—"}</td>
+          <td>${r.date ? escapeHtml(r.date) : "—"}</td>
+          <td>${formatNos(r.quantity)}</td>
+          <td>${formatBoxes(r.quantity)}</td>
+        </tr>
+      `).join("")
+    : `<tr><td colspan="5" class="matrix-empty">No pending branch requests.</td></tr>`;
+
+  return `
+    <div class="pending-so-section">
+      <div class="pending-so-head">
+        <h3>Pending Branch Requests</h3>
+        <span class="row-badge">Total requested: ${formatNos(totalQty)}${boxFactor() ? ` / ${formatBoxes(totalQty)}` : ""}</span>
+      </div>
+      <p class="pending-so-note">Stock requested by other branches from the Head Office, pending fulfilment — also reserved against Head Office stock.</p>
+      <table class="detail-table">
+        <thead>
+          <tr>
+            <th>Request No</th>
+            <th>Requesting Branch</th>
+            <th>Date</th>
+            <th>Requested (Nos)</th>
+            <th>Requested (Boxes)</th>
           </tr>
         </thead>
         <tbody>${rows}</tbody>
@@ -948,6 +1011,7 @@ function resetView(message = "Loading stock rows...") {
   el.stockList.innerHTML = `<tr><td colspan="6" class="matrix-empty">${escapeHtml(message)}</td></tr>`;
   state.locationGroups = [];
   state.pendingByWarehouse = new Map();
+  state.branchRequests = [];
   updateSummary([]);
 }
 
