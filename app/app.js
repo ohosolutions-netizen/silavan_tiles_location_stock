@@ -221,6 +221,24 @@ async function fetchItemPrice(code) {
   }
 }
 
+// TEMP: renders raw debug data on the page so it can be read without the console.
+function showDebugPanel(data) {
+  let panel = document.querySelector("#debugPanel");
+  if (!panel) {
+    panel = document.createElement("pre");
+    panel.id = "debugPanel";
+    panel.style.cssText = "margin:16px;padding:12px;background:#1a2535;color:#7CFC00;font-size:11px;white-space:pre-wrap;word-break:break-all;border-radius:6px;max-height:420px;overflow:auto;";
+    document.querySelector(".shell")?.appendChild(panel);
+  }
+  let text;
+  try {
+    text = JSON.stringify(data, null, 2);
+  } catch (_) {
+    text = String(data);
+  }
+  panel.textContent = "[DEBUG]\n" + text;
+}
+
 async function fetchStockViaFunction(code) {
   try {
     const sdk = window.ZOHO?.CREATOR;
@@ -244,6 +262,7 @@ async function fetchStockViaFunction(code) {
     }
     if (response?.code === 3000 && response?.result) {
       const d = response.result;
+      if (d.debug !== undefined) showDebugPanel(d.debug);
       const extractRows = (r) => Array.isArray(r) ? r : (Array.isArray(r?.data) ? r.data : []);
       // priceRow may arrive as a single record, OR as the raw getRecords
       // response { code, data:[record] }, OR as a list of records. Unwrap all.
