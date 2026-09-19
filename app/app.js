@@ -1095,18 +1095,20 @@ function sumValues(rows, field) {
 }
 
 function deriveBoxFactor(apiStockRows) {
+  // Use absolute non-zero values so negative stock (e.g. over-committed
+  // available = -13) still yields a valid nos-per-box ratio.
   for (const row of apiStockRows) {
     const pActual = toNumber(row.P_Actual_Stock);
     const pBox = toNumber(row.P_Actual_Stock_BOX);
-    if (pActual > 0 && pBox > 0) {
-      return Math.round((pActual / pBox) * 100) / 100;
+    if (pActual !== 0 && pBox !== 0) {
+      return Math.round(Math.abs(pActual / pBox) * 100) / 100;
     }
   }
   for (const row of apiStockRows) {
     const pAvail = toNumber(row.P_Available_Stock);
     const pAvailBox = toNumber(row.P_Available_Stock_BOX);
-    if (pAvail > 0 && pAvailBox > 0) {
-      return Math.round((pAvail / pAvailBox) * 100) / 100;
+    if (pAvail !== 0 && pAvailBox !== 0) {
+      return Math.round(Math.abs(pAvail / pAvailBox) * 100) / 100;
     }
   }
   return 0;
