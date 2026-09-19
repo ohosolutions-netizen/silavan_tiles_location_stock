@@ -618,8 +618,10 @@ function parseBranchLine(text) {
   return { code: tokens[tokens.length - 2], qty: isNaN(qty) ? 0 : qty };
 }
 
-// Each Custom API branchRequests row is { requestNo, fromBranch, date, lines:[display_value] }.
-// Parse each line, keep only the ones for the currently selected item, and sum the qty.
+// Each Custom API branchRequests row is
+//   { requestNo, sourceBranch, destBranch, date, lines:[display_value] }.
+// Parse each line, keep only the ones for the currently selected item, sum the
+// qty, and retain both source and destination so the modal can split them.
 function normalizeBranchRequests(rows) {
   const itemCode = normalizeText(state.selectedItem?.sku || "");
   const out = [];
@@ -635,7 +637,8 @@ function normalizeBranchRequests(rows) {
     if (qty !== 0) {
       out.push({
         requestNo: normalizeDisplay(row?.requestNo) || "-",
-        fromBranch: normalizeDisplay(row?.fromBranch) || "",
+        sourceBranch: normalizeDisplay(row?.sourceBranch) || "",
+        destBranch: normalizeDisplay(row?.destBranch) || "",
         quantity: qty,
         date: normalizeDisplay(row?.date) || "",
       });
@@ -931,19 +934,43 @@ function renderPendingSO(warehouse) {
   `;
 }
 
-// Branch requests are fulfilled by the Head Office, so this section only
-// renders in the HO warehouse's modal.
+// Branch requests are handled at the Head Office, so this section only renders
+// in the HO warehouse's modal. It shows two blocks: requests where the HO is the
+// SOURCE (stock going out) and where the HO is the DESTINATION (stock coming in).
 function renderBranchRequests(warehouse) {
   if (normalizeText(warehouse) !== normalizeText(HO_WAREHOUSE)) return "";
 
   const requests = state.branchRequests || [];
-  const totalQty = requests.reduce((sum, r) => sum + r.quantity, 0);
+  const isHO = (name) => normalizeText(name) === normalizeText(HO_WAREHOUSE);
 
+  const asSource = requests.filter((r) => isHO(r.sourceBranch));
+  const asDest = requests.filter((r) => isHO(r.destBranch));
+
+  return (
+    renderBranchRequestBlock(
+      "Branch Requests — Outgoing (Source)",
+      "Stock being transferred OUT of the Head Office to other branches, reserved against Head Office stock.",
+      "Destination Branch",
+      asSource,
+      (r) => r.destBranch
+    ) +
+    renderBranchRequestBlock(
+      "Branch Requests — Incoming (Destination)",
+      "Stock being transferred IN to the Head Office from other branches.",
+      "Source Branch",
+      asDest,
+      (r) => r.sourceBranch
+    )
+  );
+}
+
+function renderBranchRequestBlock(title, note, branchColLabel, requests, branchOf) {
+  const totalQty = requests.reduce((sum, r) => sum + r.quantity, 0);
   const rows = requests.length
     ? requests.map((r) => `
         <tr>
           <td>${escapeHtml(r.requestNo)}</td>
-          <td>${r.fromBranch ? escapeHtml(r.fromBranch) : "—"}</td>
+          <td>${branchOf(r) ? escapeHtml(branchOf(r)) : "—"}</td>
           <td>${r.date ? escapeHtml(r.date) : "—"}</td>
           <td>${formatNos(r.quantity)}</td>
           <td>${formatBoxes(r.quantity)}</td>
@@ -954,15 +981,15 @@ function renderBranchRequests(warehouse) {
   return `
     <div class="pending-so-section">
       <div class="pending-so-head">
-        <h3>Pending Branch Requests</h3>
-        <span class="row-badge">Total requested: ${formatNos(totalQty)}${boxFactor() ? ` / ${formatBoxes(totalQty)}` : ""}</span>
+        <h3>${escapeHtml(title)}</h3>
+        <span class="row-badge">Total: ${formatNos(totalQty)}${boxFactor() ? ` / ${formatBoxes(totalQty)}` : ""}</span>
       </div>
-      <p class="pending-so-note">Stock requested by other branches from the Head Office, pending fulfilment — also reserved against Head Office stock.</p>
+      <p class="pending-so-note">${escapeHtml(note)}</p>
       <table class="detail-table">
         <thead>
           <tr>
             <th>Request No</th>
-            <th>Requesting Branch</th>
+            <th>${escapeHtml(branchColLabel)}</th>
             <th>Date</th>
             <th>Requested (Nos)</th>
             <th>Requested (Boxes)</th>
