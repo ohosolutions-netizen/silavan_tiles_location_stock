@@ -941,14 +941,14 @@ function renderBranchRequests(warehouse) {
 
   return (
     renderBranchRequestBlock(
-      "Branch Requests — Outgoing (Source)",
+      "Branch Requests — Source",
       "Stock being transferred OUT of this branch to other branches, reserved against this branch's stock.",
       "Destination Branch",
       asSource,
       (r) => r.destBranch
     ) +
     renderBranchRequestBlock(
-      "Branch Requests — Incoming (Destination)",
+      "Branch Requests — Destination",
       "Stock being transferred IN to this branch from other branches.",
       "Source Branch",
       asDest,
