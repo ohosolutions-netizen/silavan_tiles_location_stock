@@ -30,10 +30,6 @@ const state = {
   branchRequests: [],
 };
 
-// Head Office branch — branch requests are fulfilled here, so they only
-// appear in this warehouse's detail modal.
-const HO_WAREHOUSE = "HI DESIGN (KANJIPURA MALAPPURAM)";
-
 const el = {
   form: document.querySelector("#searchForm"),
   loadStock: document.querySelector("#loadStockButton"),
@@ -221,24 +217,6 @@ async function fetchItemPrice(code) {
   }
 }
 
-// TEMP: renders raw debug data on the page so it can be read without the console.
-function showDebugPanel(data) {
-  let panel = document.querySelector("#debugPanel");
-  if (!panel) {
-    panel = document.createElement("pre");
-    panel.id = "debugPanel";
-    panel.style.cssText = "margin:16px;padding:12px;background:#1a2535;color:#7CFC00;font-size:11px;white-space:pre-wrap;word-break:break-all;border-radius:6px;max-height:420px;overflow:auto;";
-    document.querySelector(".shell")?.appendChild(panel);
-  }
-  let text;
-  try {
-    text = JSON.stringify(data, null, 2);
-  } catch (_) {
-    text = String(data);
-  }
-  panel.textContent = "[DEBUG]\n" + text;
-}
-
 async function fetchStockViaFunction(code) {
   try {
     const sdk = window.ZOHO?.CREATOR;
@@ -311,15 +289,6 @@ async function fetchStockByCode(code) {
     }
     state.pendingByWarehouse = groupPendingByWarehouse(pendingSO);
     state.branchRequests = normalizeBranchRequests(branchRequests);
-    showDebugPanel({
-      itemCode: state.selectedItem?.sku,
-      rawBranchRequests: branchRequests,
-      parsedLines: (Array.isArray(branchRequests) ? branchRequests : []).map((r) => ({
-        requestNo: r?.requestNo, sourceBranch: r?.sourceBranch, destBranch: r?.destBranch,
-        lines: (Array.isArray(r?.lines) ? r.lines : []).map((l) => ({ line: l, parsed: parseBranchLine(l) })),
-      })),
-      normalized: state.branchRequests,
-    });
 
     if (priceRow) {
       state.selectedItem = {
@@ -412,15 +381,6 @@ async function applyStockSearch(term) {
     }
     state.pendingByWarehouse = groupPendingByWarehouse(pendingSO);
     state.branchRequests = normalizeBranchRequests(branchRequests);
-    showDebugPanel({
-      itemCode: state.selectedItem?.sku,
-      rawBranchRequests: branchRequests,
-      parsedLines: (Array.isArray(branchRequests) ? branchRequests : []).map((r) => ({
-        requestNo: r?.requestNo, sourceBranch: r?.sourceBranch, destBranch: r?.destBranch,
-        lines: (Array.isArray(r?.lines) ? r.lines : []).map((l) => ({ line: l, parsed: parseBranchLine(l) })),
-      })),
-      normalized: state.branchRequests,
-    });
 
     if (priceRow) {
       state.selectedItem = {
@@ -970,29 +930,26 @@ function renderPendingSO(warehouse) {
   `;
 }
 
-// Branch requests are handled at the Head Office, so this section only renders
-// in the HO warehouse's modal. It shows two blocks: requests where the HO is the
-// SOURCE (stock going out) and where the HO is the DESTINATION (stock coming in).
+// Shows two blocks for the warehouse being viewed: requests where this branch is
+// the SOURCE (stock going out) and where it is the DESTINATION (stock coming in).
 function renderBranchRequests(warehouse) {
-  if (normalizeText(warehouse) !== normalizeText(HO_WAREHOUSE)) return "";
-
   const requests = state.branchRequests || [];
-  const isHO = (name) => normalizeText(name) === normalizeText(HO_WAREHOUSE);
+  const matches = (name) => normalizeText(name) === normalizeText(warehouse);
 
-  const asSource = requests.filter((r) => isHO(r.sourceBranch));
-  const asDest = requests.filter((r) => isHO(r.destBranch));
+  const asSource = requests.filter((r) => matches(r.sourceBranch));
+  const asDest = requests.filter((r) => matches(r.destBranch));
 
   return (
     renderBranchRequestBlock(
       "Branch Requests — Outgoing (Source)",
-      "Stock being transferred OUT of the Head Office to other branches, reserved against Head Office stock.",
+      "Stock being transferred OUT of this branch to other branches, reserved against this branch's stock.",
       "Destination Branch",
       asSource,
       (r) => r.destBranch
     ) +
     renderBranchRequestBlock(
       "Branch Requests — Incoming (Destination)",
-      "Stock being transferred IN to the Head Office from other branches.",
+      "Stock being transferred IN to this branch from other branches.",
       "Source Branch",
       asDest,
       (r) => r.sourceBranch
