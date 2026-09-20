@@ -1145,11 +1145,13 @@ function formatBoxes(quantity) {
   }
 
   const totalNos = toNumber(quantity);
-  const fullBoxes = Math.floor(totalNos / factor);
-  const looseNos = totalNos - (fullBoxes * factor);
-  const boxLabel = `${numberText(fullBoxes)} ${fullBoxes === 1 ? "Box" : "Boxes"}`;
+  const sign = totalNos < 0 ? "-" : "";
+  const absNos = Math.abs(totalNos);
+  const fullBoxes = Math.floor(absNos / factor);
+  const looseNos = absNos - (fullBoxes * factor);
+  const boxLabel = `${sign}${numberText(fullBoxes)} ${fullBoxes === 1 ? "Box" : "Boxes"}`;
 
-  return looseNos > 0 ? `${boxLabel}, ${numberText(looseNos)} Nos` : boxLabel;
+  return looseNos > 0 ? `${boxLabel}, ${sign}${numberText(looseNos)} Nos` : boxLabel;
 }
 
 function valueByCandidates(record, candidates) {
