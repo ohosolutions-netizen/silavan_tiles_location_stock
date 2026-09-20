@@ -217,24 +217,6 @@ async function fetchItemPrice(code) {
   }
 }
 
-// TEMP: renders raw debug data on the page so it can be read without the console.
-function showDebugPanel(data) {
-  let panel = document.querySelector("#debugPanel");
-  if (!panel) {
-    panel = document.createElement("pre");
-    panel.id = "debugPanel";
-    panel.style.cssText = "margin:16px;padding:12px;background:#1a2535;color:#7CFC00;font-size:11px;white-space:pre-wrap;word-break:break-all;border-radius:6px;max-height:420px;overflow:auto;";
-    document.querySelector(".shell")?.appendChild(panel);
-  }
-  let text;
-  try {
-    text = JSON.stringify(data, null, 2);
-  } catch (_) {
-    text = String(data);
-  }
-  panel.textContent = "[DEBUG]\n" + text;
-}
-
 async function fetchStockViaFunction(code) {
   try {
     const sdk = window.ZOHO?.CREATOR;
@@ -267,10 +249,9 @@ async function fetchStockViaFunction(code) {
         if (Array.isArray(r.data)) return r.data.length ? r.data[0] : null;
         return Object.keys(r).length > 0 ? r : null;
       };
-      if (d.debug !== undefined) showDebugPanel(d.debug);
       const priceRow = extractOne(d.priceRow);
-      const tilesInfo = Array.isArray(d.tilesInfo) ? d.tilesInfo
-        : Array.isArray(d.tilesInfo?.data) ? d.tilesInfo.data
+      const tilesInfo = (Array.isArray(d.tilesInfo) && d.tilesInfo.length) ? d.tilesInfo
+        : Array.isArray(d.tilesInfo?.data) && d.tilesInfo.data.length ? d.tilesInfo.data
         : (priceRow && Array.isArray(priceRow.Tiles_Information)) ? priceRow.Tiles_Information
         : [];
       return {
@@ -844,8 +825,20 @@ function buildUnitMap(rows) {
   const unitMap = {};
 
   (Array.isArray(rows) ? rows : []).forEach((row) => {
-    const unit = normalizeText(normalizeDisplay(row?.Package_Type?.Unit || row?.Package_Type));
-    const multiplier = toNumber(row?.NOS);
+    let unit = normalizeText(normalizeDisplay(row?.Package_Type?.Unit || row?.Package_Type));
+    let multiplier = toNumber(row?.NOS);
+
+    // Tiles_Information often arrives as a lookup whose display_value is a
+    // string like "BOX 2.00" (i.e. "<Package Type> <NOS per unit>"). Parse it.
+    if (!unit || !multiplier) {
+      const disp = normalizeDisplay(row?.display || row?.display_value || (typeof row === "string" ? row : ""));
+      const tokens = String(disp).trim().split(/\s+/);
+      if (tokens.length >= 2) {
+        unit = normalizeText(tokens.slice(0, -1).join(" "));
+        multiplier = toNumber(tokens[tokens.length - 1]);
+      }
+    }
+
     if (unit && multiplier > 0) {
       unitMap[unit] = multiplier;
     }
