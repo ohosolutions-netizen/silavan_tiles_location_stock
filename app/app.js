@@ -13,6 +13,7 @@ const CONFIG = {
     batch: ["BATCH_NO", "Batch", "Batch_No", "Batch_Number", "BATCH", "Batch_Name"],
     expiry: ["Expiry_Date", "Expiry", "EXPIRY_DATE"],
     pAvailable: ["P_Available_Stock"],
+    pActual: ["P_Actual_Stock"],
     actual: ["Actual_Stock"],
     reserved: ["Reserved_Stock", "Reserved_Qty", "Reserved"],
     uom: ["UOM", "Unit", "Units"],
@@ -217,24 +218,6 @@ async function fetchItemPrice(code) {
   }
 }
 
-// TEMP: renders raw debug data on the page so it can be read without the console.
-function showDebugPanel(data) {
-  let panel = document.querySelector("#debugPanel");
-  if (!panel) {
-    panel = document.createElement("pre");
-    panel.id = "debugPanel";
-    panel.style.cssText = "margin:16px;padding:12px;background:#1a2535;color:#7CFC00;font-size:11px;white-space:pre-wrap;word-break:break-all;border-radius:6px;max-height:460px;overflow:auto;";
-    document.querySelector(".shell")?.appendChild(panel);
-  }
-  let text;
-  try {
-    text = JSON.stringify(data, null, 2);
-  } catch (_) {
-    text = String(data);
-  }
-  panel.textContent = "[DEBUG]\n" + text;
-}
-
 async function fetchStockViaFunction(code) {
   try {
     const sdk = window.ZOHO?.CREATOR;
@@ -356,16 +339,6 @@ async function fetchStockByCode(code) {
       const bK = b.warehouse.toUpperCase().includes("KANJIPURA");
       if (aK !== bK) return aK ? -1 : 1;
       return a.warehouse.localeCompare(b.warehouse);
-    });
-
-    showDebugPanel({
-      itemCode: code,
-      locationRows_count: locationRows.length,
-      apiStockRows_count: apiStockRows.length,
-      filteredLocation_count: filteredLocation.length,
-      filteredApiStock_count: filteredApiStock.length,
-      locationRows_sample: locationRows.slice(0, 3),
-      apiStockRows_sample: apiStockRows.slice(0, 3),
     });
 
     renderStock(apiGroups);
@@ -595,10 +568,11 @@ function groupApiStockRows(rows) {
   rows.forEach((row) => {
     const warehouse = displayByCandidates(row, CONFIG.fields.warehouse, "Warehouse not set");
     if (!warehouses.has(warehouse)) {
-      warehouses.set(warehouse, { warehouse, pAvailable: 0 });
+      warehouses.set(warehouse, { warehouse, pAvailable: 0, pActual: 0 });
     }
     const group = warehouses.get(warehouse);
     group.pAvailable += toNumber(valueByCandidates(row, CONFIG.fields.pAvailable));
+    group.pActual += toNumber(valueByCandidates(row, CONFIG.fields.pActual));
   });
   return Array.from(warehouses.values());
 }
@@ -893,10 +867,9 @@ function renderStock(apiGroups) {
   }
 
   apiGroups.forEach((group) => {
-    const locationGroup = state.locationGroups.find((g) => g.warehouse === group.warehouse);
-    const actualTotal = locationGroup
-      ? Array.from(locationGroup.locations.values()).reduce((sum, loc) => sum + loc.actual, 0)
-      : 0;
+    // Actual stock comes from API_STOCKS (P_Actual_Stock); LOCATION_STOCK1 is
+    // only used for the location/batch breakdown in the modal.
+    const actualTotal = toNumber(group.pActual);
     const summaryRow = document.createElement("tr");
     summaryRow.className = "warehouse-summary-row";
     summaryRow.innerHTML = `
@@ -1084,8 +1057,7 @@ function renderWarehouseDetails(group) {
 
 function updateSummary(apiGroups) {
   const total = apiGroups.reduce((sum, g) => sum + g.pAvailable, 0);
-  const actualTotal = state.locationGroups.reduce((sum, g) =>
-    sum + Array.from(g.locations.values()).reduce((s, loc) => s + loc.actual, 0), 0);
+  const actualTotal = apiGroups.reduce((sum, g) => sum + toNumber(g.pActual), 0);
   const locationTotal = state.locationGroups.reduce((sum, g) => sum + g.locations.size, 0);
   const batchTotal = state.locationGroups.reduce((sum, g) =>
     sum + Array.from(g.locations.values()).reduce((s, loc) => s + loc.batches.size, 0), 0);
