@@ -259,6 +259,7 @@ async function fetchStockViaFunction(code) {
     }
     if (response?.code === 3000 && response?.result) {
       const d = response.result;
+      if (d.debug !== undefined) showDebugPanel(d.debug);
       const extractRows = (r) => Array.isArray(r) ? r : (Array.isArray(r?.data) ? r.data : []);
       // priceRow may arrive as a single record, OR as the raw getRecords
       // response { code, data:[record] }, OR as a list of records. Unwrap all.
@@ -308,13 +309,6 @@ async function fetchStockByCode(code) {
     }
     state.pendingByWarehouse = groupPendingByWarehouse(pendingSO);
     state.branchRequests = normalizeBranchRequests(branchRequests);
-    showDebugPanel({
-      itemCode: state.selectedItem?.sku,
-      pendingSO_count: Array.isArray(pendingSO) ? pendingSO.length : 0,
-      pendingSO_raw: pendingSO,
-      groupedWarehouses: Array.from(state.pendingByWarehouse.keys()),
-      branchRequests: state.branchRequests,
-    });
 
     if (priceRow) {
       state.selectedItem = {
@@ -407,13 +401,6 @@ async function applyStockSearch(term) {
     }
     state.pendingByWarehouse = groupPendingByWarehouse(pendingSO);
     state.branchRequests = normalizeBranchRequests(branchRequests);
-    showDebugPanel({
-      itemCode: state.selectedItem?.sku,
-      pendingSO_count: Array.isArray(pendingSO) ? pendingSO.length : 0,
-      pendingSO_raw: pendingSO,
-      groupedWarehouses: Array.from(state.pendingByWarehouse.keys()),
-      branchRequests: state.branchRequests,
-    });
 
     if (priceRow) {
       state.selectedItem = {
