@@ -309,6 +309,13 @@ async function fetchStockByCode(code) {
     }
     state.pendingByWarehouse = groupPendingByWarehouse(pendingSO);
     state.branchRequests = normalizeBranchRequests(branchRequests);
+    showDebugPanel({
+      itemCode: state.selectedItem?.sku,
+      pendingSO_count: Array.isArray(pendingSO) ? pendingSO.length : 0,
+      pendingSO_raw: pendingSO,
+      branchRequests_raw: branchRequests,
+      branchRequests_normalized: state.branchRequests,
+    });
 
     if (priceRow) {
       state.selectedItem = {
@@ -401,6 +408,13 @@ async function applyStockSearch(term) {
     }
     state.pendingByWarehouse = groupPendingByWarehouse(pendingSO);
     state.branchRequests = normalizeBranchRequests(branchRequests);
+    showDebugPanel({
+      itemCode: state.selectedItem?.sku,
+      pendingSO_count: Array.isArray(pendingSO) ? pendingSO.length : 0,
+      pendingSO_raw: pendingSO,
+      branchRequests_raw: branchRequests,
+      branchRequests_normalized: state.branchRequests,
+    });
 
     if (priceRow) {
       state.selectedItem = {
