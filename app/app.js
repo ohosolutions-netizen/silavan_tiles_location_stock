@@ -921,28 +921,19 @@ function renderPendingSO(warehouse) {
   `;
 }
 
-// Two blocks for the warehouse being viewed. The Custom API precomputes each
-// row's placement per item: Source = remaining still to dispatch, Destination =
-// fully dispatched (arriving) items.
+// Shows branch requests where this branch is the SOURCE and the item still has
+// quantity left to dispatch (remaining = requested - delivered). Fully-delivered
+// items are dropped by the Custom API (the SO covers the destination side).
 function renderBranchRequests(warehouse) {
   const requests = state.branchRequests || [];
   const matches = (name) => normalizeText(name) === normalizeText(warehouse);
   const asSource = requests.filter((r) => r.block === "source" && matches(r.branch));
-  const asDest = requests.filter((r) => r.block === "destination" && matches(r.branch));
 
-  return (
-    renderBranchRequestBlock(
-      "Branch Requests — Source",
-      "Stock still to be transferred OUT of this branch (remaining after deliveries), reserved against this branch's stock.",
-      "Destination Branch",
-      asSource
-    ) +
-    renderBranchRequestBlock(
-      "Branch Requests — Destination",
-      "Stock dispatched to this branch, arriving from other branches.",
-      "Source Branch",
-      asDest
-    )
+  return renderBranchRequestBlock(
+    "Branch Requests",
+    "Stock still to be transferred OUT of this branch (remaining after deliveries), reserved against this branch's stock.",
+    "Destination Branch",
+    asSource
   );
 }
 
