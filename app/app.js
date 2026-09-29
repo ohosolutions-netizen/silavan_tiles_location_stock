@@ -624,46 +624,22 @@ function groupPendingByWarehouse(pendingRows) {
   return byWarehouse;
 }
 
-// A branch-request Line_Item lookup display_value looks like:
-//   "ST/0273  TEST ONE ASARVA 1200X600 PLAIN WHITE G15001(2)SP - 99 2.00"
-// i.e. "...<item name> - <item_code> <qty>". The last two tokens are the
-// item code and quantity.
-function parseBranchLine(text) {
-  const tokens = String(normalizeDisplay(text)).trim().split(/\s+/);
-  if (tokens.length < 2) return { code: "", qty: 0 };
-  const qty = parseFloat(tokens[tokens.length - 1]);
-  return { code: tokens[tokens.length - 2], qty: isNaN(qty) ? 0 : qty };
-}
-
-// Each Custom API branchRequests row is
-//   { requestNo, sourceBranch, destBranch, date, lines:[display_value] }.
-// Parse each line, keep only the ones for the currently selected item, sum the
-// qty, and retain both source and destination so the modal can split them.
+// The Custom API pre-computes each branch-request row for the current item:
+//   { requestNo, status, salesOrder, date, qty, block:"source"|"destination",
+//     branch, otherBranch }
+// where qty is the remaining-to-transfer (source block) or full requested
+// (destination block), and branch is the warehouse it should show under.
 function normalizeBranchRequests(rows) {
-  const itemCode = normalizeText(state.selectedItem?.sku || "");
-  const out = [];
-  (Array.isArray(rows) ? rows : []).forEach((row) => {
-    const lines = Array.isArray(row?.lines) ? row.lines : [];
-    let qty = 0;
-    lines.forEach((line) => {
-      const parsed = parseBranchLine(line);
-      if (parsed.code && normalizeText(parsed.code) === itemCode) {
-        qty += parsed.qty;
-      }
-    });
-    if (qty !== 0) {
-      out.push({
-        requestNo: normalizeDisplay(row?.requestNo) || "-",
-        sourceBranch: normalizeDisplay(row?.sourceBranch) || "",
-        destBranch: normalizeDisplay(row?.destBranch) || "",
-        salesOrder: normalizeDisplay(row?.salesOrder) || "",
-        status: normalizeDisplay(row?.status) || "",
-        quantity: qty,
-        date: normalizeDisplay(row?.date) || "",
-      });
-    }
-  });
-  return out;
+  return (Array.isArray(rows) ? rows : []).map((row) => ({
+    requestNo: normalizeDisplay(row?.requestNo) || "-",
+    status: normalizeDisplay(row?.status) || "",
+    salesOrder: normalizeDisplay(row?.salesOrder) || "",
+    date: normalizeDisplay(row?.date) || "",
+    qty: toNumber(row?.qty),
+    block: normalizeText(row?.block),
+    branch: normalizeDisplay(row?.branch) || "",
+    otherBranch: normalizeDisplay(row?.otherBranch) || "",
+  })).filter((r) => r.qty !== 0);
 }
 
 async function getAllRecords(config) {
@@ -970,39 +946,39 @@ function renderBranchRequests(warehouse) {
   const requests = state.branchRequests || [];
   const matches = (name) => normalizeText(name) === normalizeText(warehouse);
 
-  const asSource = requests.filter((r) => matches(r.sourceBranch));
-  const asDest = requests.filter((r) => matches(r.destBranch));
+  // Placement is precomputed by the Custom API per item: source block shows the
+  // remaining-to-dispatch, destination block shows fully-dispatched items.
+  const asSource = requests.filter((r) => r.block === "source" && matches(r.branch));
+  const asDest = requests.filter((r) => r.block === "destination" && matches(r.branch));
 
   return (
     renderBranchRequestBlock(
       "Branch Requests — Source",
-      "Stock being transferred OUT of this branch to other branches, reserved against this branch's stock.",
+      "Stock still to be transferred OUT of this branch (remaining after deliveries), reserved against this branch's stock.",
       "Destination Branch",
-      asSource,
-      (r) => r.destBranch
+      asSource
     ) +
     renderBranchRequestBlock(
       "Branch Requests — Destination",
-      "Stock being transferred IN to this branch from other branches.",
+      "Stock dispatched to this branch, pending final transfer confirmation.",
       "Source Branch",
-      asDest,
-      (r) => r.sourceBranch
+      asDest
     )
   );
 }
 
-function renderBranchRequestBlock(title, note, branchColLabel, requests, branchOf) {
-  const totalQty = requests.reduce((sum, r) => sum + r.quantity, 0);
+function renderBranchRequestBlock(title, note, branchColLabel, requests) {
+  const totalQty = requests.reduce((sum, r) => sum + r.qty, 0);
   const rows = requests.length
     ? requests.map((r) => `
         <tr>
           <td>${escapeHtml(r.requestNo)}</td>
-          <td>${branchOf(r) ? escapeHtml(branchOf(r)) : "—"}</td>
+          <td>${r.otherBranch ? escapeHtml(r.otherBranch) : "—"}</td>
           <td>${r.salesOrder ? escapeHtml(r.salesOrder) : "—"}</td>
           <td>${r.status ? escapeHtml(r.status) : "—"}</td>
           <td>${r.date ? escapeHtml(r.date) : "—"}</td>
-          <td>${formatNos(r.quantity)}</td>
-          <td>${formatBoxes(r.quantity)}</td>
+          <td>${formatNos(r.qty)}</td>
+          <td>${formatBoxes(r.qty)}</td>
         </tr>
       `).join("")
     : `<tr><td colspan="7" class="matrix-empty">No pending branch requests.</td></tr>`;
