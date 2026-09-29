@@ -218,24 +218,6 @@ async function fetchItemPrice(code) {
   }
 }
 
-// TEMP: renders raw debug data on the page so it can be read without the console.
-function showDebugPanel(data) {
-  let panel = document.querySelector("#debugPanel");
-  if (!panel) {
-    panel = document.createElement("pre");
-    panel.id = "debugPanel";
-    panel.style.cssText = "margin:16px;padding:12px;background:#1a2535;color:#7CFC00;font-size:11px;white-space:pre-wrap;word-break:break-all;border-radius:6px;max-height:460px;overflow:auto;";
-    document.querySelector(".shell")?.appendChild(panel);
-  }
-  let text;
-  try {
-    text = JSON.stringify(data, null, 2);
-  } catch (_) {
-    text = String(data);
-  }
-  panel.textContent = "[DEBUG]\n" + text;
-}
-
 async function fetchStockViaFunction(code) {
   try {
     const sdk = window.ZOHO?.CREATOR;
@@ -259,7 +241,6 @@ async function fetchStockViaFunction(code) {
     }
     if (response?.code === 3000 && response?.result) {
       const d = response.result;
-      if (d.debug !== undefined) showDebugPanel(d.debug);
       const extractRows = (r) => Array.isArray(r) ? r : (Array.isArray(r?.data) ? r.data : []);
       // priceRow may arrive as a single record, OR as the raw getRecords
       // response { code, data:[record] }, OR as a list of records. Unwrap all.
@@ -309,13 +290,6 @@ async function fetchStockByCode(code) {
     }
     state.pendingByWarehouse = groupPendingByWarehouse(pendingSO);
     state.branchRequests = normalizeBranchRequests(branchRequests);
-    showDebugPanel({
-      itemCode: state.selectedItem?.sku,
-      pendingSO_count: Array.isArray(pendingSO) ? pendingSO.length : 0,
-      pendingSO_raw: pendingSO,
-      branchRequests_raw: branchRequests,
-      branchRequests_normalized: state.branchRequests,
-    });
 
     if (priceRow) {
       state.selectedItem = {
@@ -408,13 +382,6 @@ async function applyStockSearch(term) {
     }
     state.pendingByWarehouse = groupPendingByWarehouse(pendingSO);
     state.branchRequests = normalizeBranchRequests(branchRequests);
-    showDebugPanel({
-      itemCode: state.selectedItem?.sku,
-      pendingSO_count: Array.isArray(pendingSO) ? pendingSO.length : 0,
-      pendingSO_raw: pendingSO,
-      branchRequests_raw: branchRequests,
-      branchRequests_normalized: state.branchRequests,
-    });
 
     if (priceRow) {
       state.selectedItem = {
@@ -954,30 +921,19 @@ function renderPendingSO(warehouse) {
   `;
 }
 
-// Shows two blocks for the warehouse being viewed: requests where this branch is
-// the SOURCE (stock going out) and where it is the DESTINATION (stock coming in).
+// Shows the branch requests where this branch is the SOURCE and the item still
+// has quantity left to dispatch (remaining = requested - delivered). Once an
+// item is fully delivered, the Custom API drops it (the SO covers the destination).
 function renderBranchRequests(warehouse) {
   const requests = state.branchRequests || [];
   const matches = (name) => normalizeText(name) === normalizeText(warehouse);
-
-  // Placement is precomputed by the Custom API per item: source block shows the
-  // remaining-to-dispatch, destination block shows fully-dispatched items.
   const asSource = requests.filter((r) => r.block === "source" && matches(r.branch));
-  const asDest = requests.filter((r) => r.block === "destination" && matches(r.branch));
 
-  return (
-    renderBranchRequestBlock(
-      "Branch Requests — Source",
-      "Stock still to be transferred OUT of this branch (remaining after deliveries), reserved against this branch's stock.",
-      "Destination Branch",
-      asSource
-    ) +
-    renderBranchRequestBlock(
-      "Branch Requests — Destination",
-      "Stock dispatched to this branch, pending final transfer confirmation.",
-      "Source Branch",
-      asDest
-    )
+  return renderBranchRequestBlock(
+    "Branch Requests",
+    "Stock still to be transferred OUT of this branch (remaining after deliveries), reserved against this branch's stock.",
+    "Destination Branch",
+    asSource
   );
 }
 
