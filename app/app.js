@@ -284,6 +284,7 @@ async function fetchStockViaFunction(code) {
         pendingSO: extractRows(d.pendingSO),
         branchRequests: extractRows(d.branchRequests),
         debug: d.debug,
+        timings: d.timings,
       };
     }
     // API returned but not a success envelope — capture it for the debug panel.
@@ -321,6 +322,7 @@ async function fetchStockByCode(code) {
       itemCode: state.selectedItem?.sku,
       customApiOk: !!fnData,
       apiError: window.__lastApiError || null,
+      timings: fnData?.timings || null,
       serverDebug: fnDebug,
       pendingSO_raw: pendingSO,
       branchRequests_raw: branchRequests,
@@ -423,6 +425,7 @@ async function applyStockSearch(term) {
       itemCode: state.selectedItem?.sku,
       customApiOk: !!fnData,
       apiError: window.__lastApiError || null,
+      timings: fnData?.timings || null,
       serverDebug: fnDebug,
       pendingSO_raw: pendingSO,
       branchRequests_raw: branchRequests,
