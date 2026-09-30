@@ -259,6 +259,7 @@ async function fetchStockViaFunction(code) {
     }
     if (response?.code === 3000 && response?.result) {
       const d = response.result;
+      if (d.debug !== undefined) showDebugPanel(d.debug);
       const extractRows = (r) => Array.isArray(r) ? r : (Array.isArray(r?.data) ? r.data : []);
       // priceRow may arrive as a single record, OR as the raw getRecords
       // response { code, data:[record] }, OR as a list of records. Unwrap all.
@@ -308,7 +309,6 @@ async function fetchStockByCode(code) {
     }
     state.pendingByWarehouse = groupPendingByWarehouse(pendingSO);
     state.branchRequests = normalizeBranchRequests(branchRequests);
-    showDebugPanel({ itemCode: state.selectedItem?.sku, pendingSO_raw: pendingSO });
 
     if (priceRow) {
       state.selectedItem = {
@@ -401,7 +401,6 @@ async function applyStockSearch(term) {
     }
     state.pendingByWarehouse = groupPendingByWarehouse(pendingSO);
     state.branchRequests = normalizeBranchRequests(branchRequests);
-    showDebugPanel({ itemCode: state.selectedItem?.sku, pendingSO_raw: pendingSO });
 
     if (priceRow) {
       state.selectedItem = {
