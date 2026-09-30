@@ -250,13 +250,16 @@ async function fetchStockViaFunction(code) {
           payload: { item_code: code },
           public_key: "N0RNpJzy8CbAwK3sfrWRsJ7TS",
         }),
-        30000,
+        60000,
         "Custom API timed out."
       );
     } catch (e) {
-      console.warn("invokeCustomApi failed, falling back to direct fetch:", e?.responseText || e?.message || JSON.stringify(e));
+      const msg = e?.responseText || e?.message || JSON.stringify(e);
+      window.__lastApiError = msg;
+      console.warn("invokeCustomApi failed, falling back to direct fetch:", msg);
       return null;
     }
+    window.__lastApiError = null;
     if (response?.code === 3000 && response?.result) {
       const d = response.result;
       const extractRows = (r) => Array.isArray(r) ? r : (Array.isArray(r?.data) ? r.data : []);
@@ -283,7 +286,11 @@ async function fetchStockViaFunction(code) {
         debug: d.debug,
       };
     }
-  } catch (_) {}
+    // API returned but not a success envelope — capture it for the debug panel.
+    window.__lastApiError = "Unexpected response: " + JSON.stringify(response).slice(0, 1000);
+  } catch (e) {
+    window.__lastApiError = e?.responseText || e?.message || JSON.stringify(e);
+  }
   return null;
 }
 
@@ -312,6 +319,8 @@ async function fetchStockByCode(code) {
     state.branchRequests = normalizeBranchRequests(branchRequests);
     showDebugPanel({
       itemCode: state.selectedItem?.sku,
+      customApiOk: !!fnData,
+      apiError: window.__lastApiError || null,
       serverDebug: fnDebug,
       pendingSO_raw: pendingSO,
       branchRequests_raw: branchRequests,
@@ -412,6 +421,8 @@ async function applyStockSearch(term) {
     state.branchRequests = normalizeBranchRequests(branchRequests);
     showDebugPanel({
       itemCode: state.selectedItem?.sku,
+      customApiOk: !!fnData,
+      apiError: window.__lastApiError || null,
       serverDebug: fnDebug,
       pendingSO_raw: pendingSO,
       branchRequests_raw: branchRequests,
