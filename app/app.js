@@ -218,6 +218,24 @@ async function fetchItemPrice(code) {
   }
 }
 
+// DEBUG: renders raw debug data on the page (kept until explicitly removed).
+function showDebugPanel(data) {
+  let panel = document.querySelector("#debugPanel");
+  if (!panel) {
+    panel = document.createElement("pre");
+    panel.id = "debugPanel";
+    panel.style.cssText = "margin:16px;padding:12px;background:#1a2535;color:#7CFC00;font-size:11px;white-space:pre-wrap;word-break:break-all;border-radius:6px;max-height:600px;overflow:auto;";
+    document.querySelector(".shell")?.appendChild(panel);
+  }
+  let text;
+  try {
+    text = JSON.stringify(data, null, 2);
+  } catch (_) {
+    text = String(data);
+  }
+  panel.textContent = "[DEBUG]\n" + text;
+}
+
 async function fetchStockViaFunction(code) {
   try {
     const sdk = window.ZOHO?.CREATOR;
@@ -262,6 +280,7 @@ async function fetchStockViaFunction(code) {
         tilesInfo,
         pendingSO: extractRows(d.pendingSO),
         branchRequests: extractRows(d.branchRequests),
+        debug: d.debug,
       };
     }
   } catch (_) {}
@@ -276,10 +295,11 @@ async function fetchStockByCode(code) {
     const selected = { sku: code, item: code };
     state.selectedItem = selected;
 
-    let locationRows, apiStockRows, priceRow, tilesInfo, pendingSO, branchRequests;
+    let locationRows, apiStockRows, priceRow, tilesInfo, pendingSO, branchRequests, fnDebug;
     const fnData = await fetchStockViaFunction(code);
     if (fnData) {
       ({ locationRows, apiStockRows, priceRow, tilesInfo, pendingSO, branchRequests } = fnData);
+      fnDebug = fnData.debug;
     } else {
       const criteria = buildSkuCriteria(selected);
       [locationRows, apiStockRows, priceRow] = await Promise.all([
@@ -290,6 +310,13 @@ async function fetchStockByCode(code) {
     }
     state.pendingByWarehouse = groupPendingByWarehouse(pendingSO);
     state.branchRequests = normalizeBranchRequests(branchRequests);
+    showDebugPanel({
+      itemCode: state.selectedItem?.sku,
+      serverDebug: fnDebug,
+      pendingSO_raw: pendingSO,
+      branchRequests_raw: branchRequests,
+      branchRequests_normalized: state.branchRequests,
+    });
 
     if (priceRow) {
       state.selectedItem = {
@@ -368,10 +395,11 @@ async function applyStockSearch(term) {
     setStatus(`Loading stock data for ${formatItemLabel(selected)}...`);
     resetView("Loading stock records...");
 
-    let locationRows, apiStockRows, priceRow, tilesInfo, pendingSO, branchRequests;
+    let locationRows, apiStockRows, priceRow, tilesInfo, pendingSO, branchRequests, fnDebug;
     const fnData = await fetchStockViaFunction(selected.sku);
     if (fnData) {
       ({ locationRows, apiStockRows, priceRow, tilesInfo, pendingSO, branchRequests } = fnData);
+      fnDebug = fnData.debug;
     } else {
       const criteria = buildSkuCriteria(selected);
       [locationRows, apiStockRows, priceRow] = await Promise.all([
@@ -382,6 +410,13 @@ async function applyStockSearch(term) {
     }
     state.pendingByWarehouse = groupPendingByWarehouse(pendingSO);
     state.branchRequests = normalizeBranchRequests(branchRequests);
+    showDebugPanel({
+      itemCode: state.selectedItem?.sku,
+      serverDebug: fnDebug,
+      pendingSO_raw: pendingSO,
+      branchRequests_raw: branchRequests,
+      branchRequests_normalized: state.branchRequests,
+    });
 
     if (priceRow) {
       state.selectedItem = {
