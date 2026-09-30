@@ -988,7 +988,7 @@ function renderBranchRequests(warehouse) {
     ) +
     renderBranchRequestBlock(
       "Branch Requests — Destination",
-      "Stock dispatched to this branch, arriving from other branches.",
+      "Stock still to arrive at this branch (requested minus delivered), incoming from other branches.",
       "Source Branch",
       asDest
     )
